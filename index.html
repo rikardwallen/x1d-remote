@@ -313,7 +313,8 @@ class SimTransport {
       } else if (code === A.RELEASE_IMG) {
         this.event(0x42, u8([0x2d], te.encode('i0')), 40);
       } else if (code === A.LIVE) {
-        this.setVal(P.LIVE, val[0] ? 'i1' : 'i0');
+        if (val[0]) { this.setVal(P.LIVE, 'i1'); this.liveStream(true); }
+        else { this.liveStream(false); setTimeout(() => this.setVal(P.LIVE, 'i0'), 600); }   // the real camera's "off" notice can arrive late
       }
     } else if (op === OP.BULK) {
       this.reply(seq, 0x87, ack(0));
@@ -336,6 +337,18 @@ class SimTransport {
     this.pushData(blocks, 22);
   }
   static zero = new Uint8Array(2 << 20);
+  static liveFrame() {                      // one LIVE frame like the camera's: header + 2816 x 1260 RGGB gradient
+    const W = 2816, H = 1260, F = 1024 + W * H * 2, f = new Uint8Array(F), dv = new DataView(f.buffer);
+    f.set([0x4c,0x49,0x56,0x45]); dv.setUint32(4, 2, true); dv.setUint32(8, 1024, true); dv.setUint32(12, F, true); dv.setUint32(16, W, true); dv.setUint32(20, H, true);
+    const px = new Uint16Array(f.buffer, 1024, W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) px[y * W + x] = x >= 2790 && x < 2800 ? 65510 : x >= 2774 ? 276 : 276 + ((x * 3 + y) % 2000);
+    return f;
+  }
+  liveStream(on) {
+    clearInterval(this.lvTimer); if (!on) return;
+    const frame = SimTransport._lf || (SimTransport._lf = SimTransport.liveFrame()); let off = 0;
+    this.lvTimer = setInterval(() => { for (let k = 0; k < 2; k++) { const c = frame.subarray(off, Math.min(frame.length, off + (1 << 20))); off = (off + c.length) % frame.length; const w = this.dataWaiters.shift(); w ? w(c) : this.data.push(c); } }, 50);
+  }
   static fake3FRHead() {
     const W = 1440, H = 1080, OFF = 7680, head = new Uint8Array(6 << 20), dv = new DataView(head.buffer);
     head.set([0x49,0x49,0x2a,0,8,0,0,0]);
@@ -370,7 +383,7 @@ class UsbTransport {
 
 /* ============================== camera ============================== */
 class Camera {
-  constructor(t, log) { this.t = t; this.log = log; this.seq = 0; this.asm = new Reassembler(); this.pending = new Map(); this.onEvent = () => {}; this.alive = true; this.chain = Promise.resolve(); this.orphan = null; this.lvOn = false; this.cardPaths = []; this.readLoop(); }
+  constructor(t, log) { this.t = t; this.log = log; this.seq = 0; this.asm = new Reassembler(); this.pending = new Map(); this.onEvent = () => {}; this.alive = true; this.chain = Promise.resolve(); this.orphan = null; this.lvOn = false; this.cardPaths = []; this.fails = 0; this.readLoop(); }
   async readLoop() {
     while (this.alive) {
       let p; try { p = await this.t.transferIn(2, PKT); } catch (e) { if (this.alive) { this.alive = false; this.stopKeepAlive(); this.onEvent({type:'lost', error: String(e)}); } return; }
@@ -391,8 +404,10 @@ class Camera {
       const frame = encodeFrame(seq, op, code, value);
       if (!quiet) this.log('→ op ' + op + (code != null ? ' code 0x' + code.toString(16).padStart(2,'0') : '') + (value.length ? ' ' + (td.decode(value).match(/^[\x20-\x7e]+$/) ? td.decode(value) : hex(value)) : ''));
       const got = new Promise((res, rej) => { this.pending.set(seq, res); setTimeout(() => { if (this.pending.delete(seq)) rej(new Error('No reply from camera (op ' + op + ')')); }, timeout); });
-      await this.t.transferOut(2, frame);
-      const f = await got;
+      let tm; const sent = Promise.race([this.t.transferOut(2, frame), new Promise((_, rej) => { tm = setTimeout(() => rej(new Error('Camera not accepting commands (op ' + op + ')')), 3000); })]);
+      try { await sent; } catch (e) { this.pending.delete(seq); got.catch(() => {}); this.log('! ' + e.message); if (++this.fails === 3) this.onEvent({type: 'stalled'}); throw e; } finally { clearTimeout(tm); }
+      let f; try { f = await got; } catch (e) { if (++this.fails === 3) this.onEvent({type: 'stalled'}); throw e; }
+      this.fails = 0;
       if (!quiet && f.payload.length === 4 && op !== OP.READ) this.log('   ack ' + new DataView(f.payload.buffer, f.payload.byteOffset).getUint32(0, true));
       return f.payload;
     };
@@ -438,7 +453,8 @@ class Camera {
     this.stopKeepAlive(); let n = 0, busy = false;
     this.ka = setInterval(async () => {
       if (busy || !this.alive) return; busy = true;
-      try { await this.call(OP.READ, 0x94, undefined, 3000, true); if (++n % 4 === 0) { await this.call(OP.READ, 0x95, undefined, 3000, true); await this.call(OP.READ, P.LIVE, undefined, 3000, true); } } catch (e) {}
+      try { await this.call(OP.READ, 0x94, undefined, 3000, true); if (++n % 4 === 0) { await this.call(OP.READ, 0x95, undefined, 3000, true); await this.call(OP.READ, P.LIVE, undefined, 3000, true); } this.kaFails = 0; }
+      catch (e) { if ((this.kaFails = (this.kaFails || 0) + 1) <= 3 || this.kaFails % 20 === 0) this.log('keep-alive failed (' + this.kaFails + '): ' + e.message); }
       busy = false;
     }, 250);
   }
@@ -484,11 +500,14 @@ class Camera {
       await this.write(P.APERTURE, te.encode('r20000a')); ack = await this.live(true);
     }
     if (ack !== 0) throw new Error('The camera refused live view (code ' + ack + ')');
-    this.lvOn = true; const parser = new LiveParser(onFrame);
-    (async () => { while (this.lvOn && this.alive) { const c = await this.readData(1 << 20, 3000); if (!this.lvOn) break; if (c) parser.push(c); } })();
+    this.lvOn = true; const gen = this.lvGen = (this.lvGen || 0) + 1, parser = new LiveParser(onFrame);
+    this.lvLoop = (async () => {                         // exactly one reader per live-view run
+      while (this.lvGen === gen && this.alive) { const c = await this.readData(1 << 20, 1500); if (this.lvGen !== gen) break; if (c) parser.push(c); }
+    })();
   }
   async liveStop() {
-    this.lvOn = false; const ack = await this.live(false);
+    this.lvOn = false; this.lvGen = (this.lvGen || 0) + 1; const ack = await this.live(false);
+    await Promise.race([this.lvLoop || Promise.resolve(), new Promise(r => setTimeout(r, 900))]);   // let the old reader finish
     if (this.lvAp && this.lvAp.length) { await this.write(P.APERTURE, this.lvAp); } this.lvAp = null;
     return ack;
   }
@@ -572,7 +591,7 @@ function previewFrom3FR(head) {
     g.putImageData(img, 0, 0); return c;
   } catch (e) { return null; }
 }
-window.X1D = {encodeFrame, Reassembler, decodeTyped, encDouble, encRational, Camera, SimTransport, frameReply, LiveParser, renderLiveFrame, previewFrom3FR, parseCardList};
+window.X1D = {attach: t => attach(t), encodeFrame, Reassembler, decodeTyped, encDouble, encRational, Camera, SimTransport, frameReply, LiveParser, renderLiveFrame, previewFrom3FR, parseCardList};
 
 /* ============================== UI ============================== */
 const $ = id => document.getElementById(id);
@@ -580,6 +599,7 @@ const S = {cam: null, mode: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 41, lv:
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
+log('X1D Remote build 2026-11-21b · ' + navigator.userAgent);
 $('btnLog').onclick = () => saveFile(new Blob([logLines.join('\n')], {type: 'text/plain'}), 'x1d_log_' + stamp() + '.txt');
 $('logBox').addEventListener('toggle', () => { logEl.textContent = logLines.join('\n'); logEl.scrollTop = 1e9; });
 const say = s => { $('state').textContent = s; };
@@ -662,7 +682,8 @@ new ResizeObserver(sizeCanvas).observe(cv);
 
 /* --- camera events keep the app in step with the body --- */
 function onEvent(ev) {
-  if (ev.type === 'lost') { setConn('off', 'Camera disconnected'); S.cam = null; S.lv = false; say('Lost the camera: ' + ev.error); return; }
+  if (ev.type === 'lost') { log('camera lost: ' + ev.error); setConn('off', 'Camera disconnected'); S.cam = null; S.lv = false; say('Lost the camera: ' + ev.error); return; }
+  if (ev.type === 'stalled') { log('camera stopped answering'); setConn('off', 'Camera not responding'); say('The camera stopped answering. Unplug and replug the cable, then tap Connect camera.'); vfMessage('The camera stopped answering.<br>Unplug and replug the cable, then tap <b>Connect camera</b>.'); return; }
   if (ev.type === 'image') { if (!S.expecting) bodyShot(ev); return; }
   if (ev.type !== 'changed') return;
   const v = ev.value;
@@ -671,7 +692,13 @@ function onEvent(ev) {
   else if (ev.code === P.SHUTTER && v && v.num != null) { const n = shutterName(v); if (n !== 'auto') S.sh = n; }
   else if (ev.code === P.BATTERY) S.battery = v;
   else if (ev.code === P.MODE) S.mode = v;
-  else if (ev.code === P.LIVE) { S.lv = !!v; $('ovLv').textContent = S.lv ? 'Live view' : 'Live view off'; }
+  else if (ev.code === P.LIVE) {
+    if (!S.real) { S.lv = !!v; $('ovLv').textContent = S.lv ? 'Live view' : 'Live view off'; }
+    else if (!v && S.lv && !S.lvChanging && performance.now() - S.lvChangedAt > 2500) {   // the camera ended live view by itself
+      S.lv = false; if (S.cam) S.cam.liveStop().catch(() => {}); $('ovLv').textContent = 'Live view off'; vfMessage('The camera stopped live view.<br>Tap <b>Live view</b> to start it again.'); log('camera ended live view');
+    }
+    return;
+  }
   else if (ev.code === P.LEFT) $('ovShots').textContent = v + ' in buffer';
   else return;
   renderDials(); draw();
@@ -773,7 +800,7 @@ async function importShot(ev, label, meta) {
 }
 async function withLiveViewPaused(fn) {
   const wasLv = S.real && S.lv && S.cam && S.cam.lvOn;
-  if (wasLv) { await S.cam.liveStop().catch(() => {}); }
+  if (wasLv) { await stopLive().catch(() => {}); }
   try { return await fn(); }
   finally { if (wasLv && S.cam) { await sleep(300); await startLive().catch(e => say(e.message)); } }
 }
@@ -798,8 +825,9 @@ function bodyShot(ev) {
   bodyQueue = bodyQueue.then(() => withLiveViewPaused(() => importShot(ev, ' (shot on camera)', 'Shot on camera'))).then(() => say('Imported a shot taken on the camera')).catch(e => say(e.message));
 }
 $('rel').onclick = async () => {
-  if (S.busy) return; if (!S.cam) { say('No camera connected'); return; }
-  S.busy = true; $('rel').classList.add('busy');
+  log('tap: release' + (S.busy ? ' (busy: ' + S.busyWhat + ')' : ''));
+  if (S.busy) { say('Busy (' + S.busyWhat + '). Try again in a moment.'); return; } if (!S.cam) { say('No camera connected'); return; }
+  S.busy = true; S.busyWhat = 'shooting'; $('rel').classList.add('busy');
   try {
     for (let s = S.delay; s > 0; s--) { say('Self-timer ' + s + ' s'); await sleep(1000); }
     await withLiveViewPaused(async () => { for (let i = 0; i < S.reps; i++) { await fireOnce(i); if (i < S.reps - 1) await sleep(600); } });
@@ -807,22 +835,45 @@ $('rel').onclick = async () => {
   } catch (e) { say(e.message); hideProg(); }
   S.busy = false; $('rel').classList.remove('busy');
 };
-let lvFrames = 0, lvT0 = 0, lvBusy = false;
+let lvFrames = 0, lvT0 = 0, lvBusy = false, lvLast = 0, lvRestarts = 0;
+S.lvChangedAt = 0;
+window.X1D_LOG = () => logLines.join('\n');
+window.X1D_LV = () => ({frames: lvFrames, sinceLast: Math.round(performance.now() - lvLast), lv: S.lv, busy: S.busy, restarts: lvRestarts});
 async function startLive() {
-  lvFrames = 0; lvT0 = performance.now();
-  await S.cam.liveStart(f => {
-    if (lvBusy) return; lvBusy = true;
-    requestAnimationFrame(() => { if (S.lv && S.real) { renderLiveFrame(f, cv); lvFrames++; if (lvFrames === 1) vfMessage(''); } lvBusy = false; });
-  });
-  S.lv = true; $('ovLv').textContent = 'Live view on';
+  lvFrames = 0; lvT0 = lvLast = performance.now(); S.lvChanging = true;
+  try {
+    await S.cam.liveStart(f => {
+      lvLast = performance.now();
+      if (lvBusy) return; lvBusy = true;
+      requestAnimationFrame(() => { try { if (S.lv && S.real) { renderLiveFrame(f, cv); lvFrames++; if (lvFrames === 1) vfMessage(''); } } finally { lvBusy = false; } });
+    });
+    S.lv = true; $('ovLv').textContent = 'Live view on';
+  } finally { S.lvChanging = false; S.lvChangedAt = performance.now(); }
 }
+async function stopLive() {
+  S.lvChanging = true;
+  try { if (S.cam) await S.cam.liveStop(); } finally { S.lv = false; S.lvChanging = false; S.lvChangedAt = performance.now(); }
+}
+/* watchdog: if frames stop arriving while live view is on, restart it (at most once every 10 s) */
+setInterval(async () => {
+  if (!S.real || !S.lv || !S.cam || S.busy || S.lvChanging || document.hidden) return;
+  const now = performance.now();
+  if (now - lvLast < 4000 || now - S.lvChangedAt < 10000) return;
+  log('live view: no frames for ' + Math.round((now - lvLast) / 1000) + ' s, restarting'); lvRestarts++;
+  S.busy = true; S.busyWhat = 'restarting live view';
+  try { await stopLive(); await sleep(400); await startLive(); say('Live view restarted'); } catch (e) { say('Live view stopped: ' + e.message); vfMessage('Live view stopped.<br>Tap <b>Live view</b> to try again.'); $('ovLv').textContent = 'Live view off'; }
+  S.busy = false;
+}, 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) lvLast = performance.now(); });
 $('ovLv').onclick = async () => {
   if (!S.cam) return;
   if (!S.real) { S.lv = !S.lv; $('ovLv').textContent = S.lv ? 'Live view' : 'Live view off'; draw(); return; }
-  if (S.busy) return; S.busy = true;
+  log('tap: live view ' + (S.lv ? 'off' : 'on') + (S.busy ? ' (busy: ' + S.busyWhat + ')' : ''));
+  if (S.busy) { say('Busy (' + S.busyWhat + '). Try again in a moment.'); return; }
+  S.busy = true; S.busyWhat = 'live view';
   try {
-    if (!S.lv) { vfMessage('Starting live view…'); await startLive(); say('Live view on. The camera’s own shutter button is disabled while it runs.'); }
-    else { await S.cam.liveStop(); S.lv = false; $('ovLv').textContent = 'Live view off'; draw(); vfMessage('Live view off'); const fps = lvFrames / ((performance.now() - lvT0) / 1000); say(`Live view stopped (${fps.toFixed(1)} frames a second)`); }
+    if (!S.lv) { vfMessage('Starting live view…'); await Promise.race([startLive(), sleep(12000).then(() => { throw new Error('Live view didn’t start (no reply from the camera)'); })]); say('Live view on. The camera’s own shutter button is disabled while it runs.'); }
+    else { await stopLive(); $('ovLv').textContent = 'Live view off'; draw(); vfMessage('Live view off'); const fps = lvFrames / ((performance.now() - lvT0) / 1000); say(`Live view stopped (${fps.toFixed(1)} frames a second)`); }
   } catch (e) { vfMessage(''); say(e.message); }
   S.busy = false;
 };
