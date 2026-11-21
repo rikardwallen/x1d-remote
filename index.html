@@ -13,7 +13,8 @@
    PICTURE the viewfinder itself, live, with the camera's exposure readout laid over it
    COLOUR graphite ground, warm white ink, brushed aluminium controls, Phocus orange for the release only
    TYPE   Barlow Semi Condensed for readouts (like the camera's LCD), Barlow for text
-   LAYOUT wide (Fold open, PC): viewfinder left, control column right. Narrow (Fold cover): bar, viewfinder, dials, release */
+   LAYOUT wide (Fold open, PC): layout A, viewfinder sized to fit the height, control rail right (tiles, focus, timer, release), session strip and full settings below.
+          Narrow (Fold cover): bar, viewfinder, release card, settings cards */
 :root{color-scheme:dark;--fd:"Barlow Semi Condensed","Arial Narrow","Roboto Condensed",system-ui,sans-serif;--ft:Barlow,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--bg:#141516;--panel:#1d1f21;--edge:#2c2f32;--ink:#f1efe9;--dim:#9a9d9f;--alu:#c9ccd0;--alu2:#8f9397;--org:#f26b1d;--ok:#5fc27a;--warn:#e5b33f;--bad:#e8584a}
 :root[data-theme=light]{color-scheme:dark}
 *{box-sizing:border-box;min-width:0}
@@ -34,7 +35,7 @@ button{font:inherit;color:inherit}
 .btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--edge);background:var(--panel);cursor:pointer}
 .btn:hover{border-color:var(--alu2)}.btn:focus-visible,.seg button:focus-visible,.key:focus-visible,.rel:focus-visible,.strip button:focus-visible{outline:2px solid var(--org);outline-offset:2px}
 .btn.alu{background:linear-gradient(#d6d9dc,#b4b8bc);color:#17191b;border-color:#e6e8ea;font-weight:600}
-.app{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,1fr);grid-template-areas:"vf ctl" "shot ctl" "ses ctl";grid-template-rows:auto auto 1fr;gap:16px;align-items:start;padding:16px max(16px,env(safe-area-inset-right)) 16px max(16px,env(safe-area-inset-left));max-width:1400px;margin:0 auto}
+.app{display:grid;grid-template-columns:minmax(0,clamp(420px,calc((100vh - 250px) * 4 / 3),calc(100% - 276px))) minmax(244px,1fr);grid-template-columns:minmax(0,clamp(420px,calc((100dvh - 250px) * 4 / 3),calc(100% - 276px))) minmax(244px,1fr);grid-template-areas:"vf rail" "ses ses" "ctl ctl";grid-template-rows:auto;gap:16px;align-items:start;padding:16px max(16px,env(safe-area-inset-right)) 16px max(16px,env(safe-area-inset-left));max-width:1400px;margin:0 auto}
 .vf{grid-area:vf;position:relative;aspect-ratio:4/3;background:#000;border-radius:14px;overflow:hidden;border:1px solid var(--edge);align-self:start}
 .vf canvas{position:absolute;inset:0;width:100%;height:100%}
 .ov{position:absolute;left:0;right:0;display:flex;align-items:center;gap:14px;padding:10px 14px;font-size:15px;pointer-events:none}
@@ -51,9 +52,23 @@ button{font:inherit;color:inherit}
 .flash{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none}
 .flash.go{animation:fl .45s ease-out}
 @keyframes fl{0%{opacity:1}100%{opacity:0}}
-.ctl{grid-area:ctl;display:flex;flex-direction:column;gap:14px}
+.ctl{grid-area:ctl;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:start}
 .ses{grid-area:ses}
-.shot{grid-area:shot}
+/* control rail (layout A): exposure tiles, focus keys, timer, release. Narrow screens show only the release card. */
+.rail{grid-area:rail;display:flex;flex-direction:column;gap:10px;align-self:stretch;max-width:400px}
+.tiles{display:flex;flex-direction:column;gap:10px}
+.tile{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:8px}
+.tile .tv{flex:1;text-align:center;line-height:1.1}.tile .tv span{display:block;font-size:13px;color:var(--dim)}.tile .tv b{font-size:28px;font-weight:600}
+.tile .arr{width:48px;height:48px;flex:none;border-radius:10px;border:1px solid var(--edge);background:#17181a;display:grid;place-items:center;cursor:pointer}
+.tile.lock .arr{opacity:.35;pointer-events:none}.tile.lock .tv span::after{content:" · set by camera"}
+.rfocus{display:flex;gap:8px;background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:8px}
+.rfocus .key{height:52px}.rfocus #rfAF{flex:1.3}
+.rail .shotc{flex:1;display:flex;flex-direction:column;background:none;border:0;padding:0}
+.rail .shoot{flex:1;display:flex;flex-direction:column-reverse;justify-content:flex-start;align-items:stretch;gap:14px}
+.rail .opts .row>span{min-width:58px}
+.rail .shoot .rel{align-self:center;width:128px;height:128px;margin-top:auto}
+.rail .opts .row{flex-wrap:nowrap}.rail .opts .seg{flex:1}.rail .opts .seg button{flex:1;padding:0 6px}
+.ctl .fkeys{display:none}
 .card{background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:14px}
 .card h2{margin:0 0 10px;font:600 15px/1.2 var(--ft);color:var(--dim);display:flex;justify-content:space-between;gap:8px}
 .card h2 em{font-style:normal;color:var(--ink)}
@@ -104,7 +119,7 @@ button{font:inherit;color:inherit}
 .modal.on{display:grid}
 .modal .card{max-width:460px;font-size:15px}
 .modal p{margin:0 0 10px}
-@media(max-width:860px){.app{grid-template-columns:minmax(0,1fr);grid-template-areas:"vf" "shot" "ctl" "ses";grid-template-rows:auto}.vf{aspect-ratio:4/3}}
+@media(max-width:860px){.app{grid-template-columns:minmax(0,1fr);grid-template-areas:"vf" "rail" "ctl" "ses";grid-template-rows:auto}.vf{aspect-ratio:4/3}.ctl{display:flex;flex-direction:column;align-items:stretch}.rail{max-width:none}.tiles,.rfocus{display:none}.rail .shotc{display:block;background:var(--panel);border:1px solid var(--edge);padding:14px}.rail .shoot{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}.rail .shoot .rel{width:96px;height:96px;margin-top:0}.rail .opts .seg{flex:none}.ctl .fkeys{display:flex}}
 @media(max-width:600px){.brand small{display:none}#btnConnect{flex:1}.rel{width:84px;height:84px}.ov{font-size:13px;gap:10px}.meter svg{width:110px}}
 @media(prefers-reduced-motion:reduce){.flash.go{animation:none}}
 </style>
@@ -114,6 +129,7 @@ button{font:inherit;color:inherit}
   <div class="brand">X1D Remote <small>for Hasselblad X1D-50c</small></div>
   <span class="pill" id="conn"><span class="dot"></span><span id="connTxt">Demo camera</span></span>
   <span class="batt num" id="batt" title="Camera battery"><i><b id="battFill" style="width:40%"></b></i><span id="battTxt">41%</span></span>
+  <button class="btn" id="btnFull" aria-label="Full screen" title="Full screen" style="width:44px;padding:0;display:grid;place-items:center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4"/></svg></button>
   <button class="btn alu" id="btnConnect">Connect camera</button>
 </header>
 
@@ -136,16 +152,24 @@ button{font:inherit;color:inherit}
     </div>
   </section>
 
-  <section class="card shot" aria-label="Shutter">
-    <div class="shoot">
-      <button class="rel" id="rel" aria-label="Release shutter"></button>
-      <div class="opts">
-        <div class="row" style="justify-content:space-between"><span>Delay</span><div class="seg" id="segDelay"><button data-d="0" class="on">Off</button><button data-d="2">2 s</button><button data-d="10">10 s</button></div></div>
-        <div class="row" style="justify-content:space-between"><span>Frames</span><div class="seg" id="segRep"><button data-r="1" class="on">1</button><button data-r="3">3</button><button data-r="10">10</button></div></div>
-      </div>
+  <section class="rail" aria-label="Controls">
+    <div class="tiles">
+      <div class="tile" id="tS"><button type="button" class="arr" data-k="sh" data-d="-1" aria-label="Faster shutter"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4 6 9l5 5"/></svg></button><div class="tv"><span>Shutter</span><b class="num" id="tvS"></b></div><button type="button" class="arr" data-k="sh" data-d="1" aria-label="Slower shutter"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 4 5 5-5 5"/></svg></button></div>
+      <div class="tile" id="tA"><button type="button" class="arr" data-k="ap" data-d="-1" aria-label="Wider aperture"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4 6 9l5 5"/></svg></button><div class="tv"><span>Aperture</span><b class="num" id="tvA"></b></div><button type="button" class="arr" data-k="ap" data-d="1" aria-label="Narrower aperture"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 4 5 5-5 5"/></svg></button></div>
+      <div class="tile" id="tI"><button type="button" class="arr" data-k="iso" data-d="-1" aria-label="Lower ISO"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4 6 9l5 5"/></svg></button><div class="tv"><span>ISO</span><b class="num" id="tvI"></b></div><button type="button" class="arr" data-k="iso" data-d="1" aria-label="Higher ISO"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 4 5 5-5 5"/></svg></button></div>
     </div>
-    <div class="state" id="state" style="margin-top:10px">Ready</div>
-    <div class="prog" id="prog" hidden><i id="progBar"></i></div>
+    <div class="rfocus"><button class="key" id="rfMinus" aria-label="Focus closer">−</button><button class="key" id="rfAF">AF</button><button class="key" id="rfPlus" aria-label="Focus further">+</button></div>
+    <div class="card shotc">
+      <div class="shoot">
+        <button class="rel" id="rel" aria-label="Release shutter"></button>
+        <div class="opts">
+          <div class="row" style="justify-content:space-between"><span>Delay</span><div class="seg" id="segDelay"><button data-d="0" class="on">Off</button><button data-d="2">2 s</button><button data-d="10">10 s</button></div></div>
+          <div class="row" style="justify-content:space-between"><span>Frames</span><div class="seg" id="segRep"><button data-r="1" class="on">1</button><button data-r="3">3</button><button data-r="10">10</button></div></div>
+        </div>
+      </div>
+      <div class="state" id="state" style="margin-top:10px">Ready</div>
+      <div class="prog" id="prog" hidden><i id="progBar"></i></div>
+  </div>
   </section>
 
   <section class="ctl">
@@ -160,7 +184,7 @@ button{font:inherit;color:inherit}
 
     <div class="card">
       <h2>Focus <em class="num" id="focTxt">manual</em></h2>
-      <div class="row">
+      <div class="row fkeys">
         <button class="key" id="fMinus" aria-label="Focus closer">−</button>
         <button class="key" id="fAF">AF</button>
         <button class="key" id="fPlus" aria-label="Focus further">+</button>
@@ -613,7 +637,7 @@ const S = {cam: null, mode: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 41, lv:
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-21e · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-21f · ' + navigator.userAgent);
 $('btnLog').onclick = () => saveFile(new Blob([logLines.join('\n')], {type: 'text/plain'}), 'x1d_log_' + stamp() + '.txt');
 $('logBox').addEventListener('toggle', () => { logEl.textContent = logLines.join('\n'); logEl.scrollTop = 1e9; });
 const say = s => { $('state').textContent = s; };
@@ -626,17 +650,32 @@ function buildStrip(el, items, cur, onPick) {
   const on = el.querySelector('.on'); if (on) el.scrollLeft = on.offsetLeft - el.clientWidth / 2 + on.clientWidth / 2;
 }
 const shutterChoices = SHUTTERS.filter(s => s.name !== 'T').map(s => s.name).reverse();
+function nearestShutter() {             // a metered speed between stops: the nearest stop
+  if (shutterChoices.includes(S.sh)) return S.sh;
+  const t = shutterSeconds(S.sh); let best = null, bd = 1e9;
+  for (const n of shutterChoices) { if (n === 'B') continue; const d = Math.abs(Math.log(shutterSeconds(n) / t)); if (d < bd) { bd = d; best = n; } }
+  return best;
+}
+/* the rail's ‹ › buttons step one stop along the same order as the strips (B is skipped) */
+function stepExp(kind, d) {
+  const list = kind === 'sh' ? shutterChoices.filter(n => n !== 'B') : kind === 'ap' ? APERTURES.map(a => a[2]) : ISOS;
+  const cur = kind === 'sh' ? nearestShutter() : kind === 'ap' ? S.ap : S.iso;
+  const i = list.indexOf(cur), j = i < 0 ? 0 : Math.max(0, Math.min(list.length - 1, i + d));
+  if (j !== i) setExp(kind, list[j]);
+}
+document.querySelectorAll('.tile .arr').forEach(b => b.onclick = () => stepExp(b.dataset.k, +b.dataset.d));
 function renderDials() {
-  let shOn = S.sh;                      // a metered speed between stops: highlight the nearest stop
-  if (!shutterChoices.includes(shOn)) { const t = shutterSeconds(shOn); let best = null, bd = 1e9; for (const n of shutterChoices) { if (n === 'B') continue; const d = Math.abs(Math.log(shutterSeconds(n) / t)); if (d < bd) { bd = d; best = n; } } shOn = best; }
+  const shOn = nearestShutter();
   buildStrip($('sS'), shutterChoices, shOn, v => setExp('sh', v));
   buildStrip($('sA'), APERTURES.map(a => a[2]), S.ap, v => setExp('ap', v));
   buildStrip($('sI'), ISOS.map(String), String(S.iso), v => setExp('iso', +v));
   $('lS').textContent = S.sh; $('lA').textContent = 'f/' + S.ap; $('lI').textContent = S.iso;
   $('roS').textContent = S.sh; $('roA').textContent = S.ap; $('roI').textContent = S.iso;
+  $('tvS').textContent = S.sh; $('tvA').textContent = 'f/' + S.ap; $('tvI').textContent = S.iso;
   $('ovMode').textContent = MODE_LETTER[S.mode] || '?'; $('modeTxt').textContent = MODES[S.mode] || 'Unknown';
   $('dS').classList.toggle('lock', !(S.mode === 0 || S.mode === 2 || S.mode === 10));
   $('dA').classList.toggle('lock', !(S.mode === 0 || S.mode === 1 || S.mode === 10));
+  $('tS').classList.toggle('lock', $('dS').classList.contains('lock')); $('tA').classList.toggle('lock', $('dA').classList.contains('lock'));
   $('battFill').style.width = Math.max(4, S.battery * 0.8) + '%'; $('battTxt').textContent = S.battery + '%';
   drawMeter();
 }
@@ -755,6 +794,10 @@ function showCard(paths) {
   $('cardCount').textContent = paths.length ? `· ${shots.length} RAW` : '';
   $('cardList').textContent = paths.filter(p => /\.(3FR|JPG|TIF)$/i.test(p)).slice(-200).reverse().map(p => p.split('/').pop()).join('\n') || 'Nothing listed.';
 }
+/* full screen hides Chrome's address and navigation bars, which take a lot of the Fold's height */
+if (!document.fullscreenEnabled) $('btnFull').style.display = 'none';
+$('btnFull').onclick = () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else document.documentElement.requestFullscreen({navigationUI: 'hide'}).catch(e => say('Full screen isn\u2019t available: ' + e.message)); };
+document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; $('btnFull').setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen'); $('btnFull').title = on ? 'Exit full screen' : 'Full screen'; });
 window.addEventListener('pagehide', () => { if (S.cam && S.real) S.cam.disconnect(); });
 $('btnConnect').onclick = async () => {
   const noUsb = () => modal(`<p><b>USB isn\u2019t available here.</b></p><p>This preview runs inside a sandbox that blocks USB. To use your camera, open <b>x1d-remote.html</b> in Chrome on your Fold or in Chrome or Edge on your PC, from an https address or your own computer.</p><p>Close Phocus first: only one app can hold the camera.</p>`);
@@ -769,8 +812,8 @@ const moveFocus = async dir => {
   const n = dir * S.step; S.focus = Math.max(0, Math.min(1000, S.focus + n * 0.4)); draw();
   if (S.cam) try { await S.cam.focus(n); } catch (e) { say(e.message); }
 };
-$('fMinus').onclick = () => moveFocus(-1); $('fPlus').onclick = () => moveFocus(1);
-$('fAF').onclick = async () => {
+$('fMinus').onclick = $('rfMinus').onclick = () => moveFocus(-1); $('fPlus').onclick = $('rfPlus').onclick = () => moveFocus(1);
+$('fAF').onclick = $('rfAF').onclick = async () => {
   say('Focusing…'); $('focTxt').textContent = 'AF';
   if (S.cam) try { await S.cam.action(A.AF); } catch (e) { say(e.message); return; }
   if (!S.real) { const from = S.focus, t0 = performance.now(); const step = now => { const p = Math.min(1, (now - t0) / 700); S.focus = from + (S.subject - from) * (1 - Math.pow(1 - p, 3)); draw(); if (p < 1) requestAnimationFrame(step); else { say('Focused'); $('focTxt').textContent = 'manual'; } }; requestAnimationFrame(step); }
