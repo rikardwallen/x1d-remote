@@ -503,9 +503,14 @@ class Camera {
     }
     if (ack !== 0) throw new Error('The camera refused live view (code ' + ack + ')');
     this.lvOn = true; const gen = this.lvGen = (this.lvGen || 0) + 1, parser = new LiveParser(onFrame);
+    const st = this.lvStats = {reads: 0, bytes: 0, timeouts: 0, empty: 0, frames: 0, sizes: {}, t0: performance.now(), parser};
     this.lvLoop = (async () => {                         // exactly one reader per live-view run
-      while (this.lvGen === gen && this.alive) { const c = await this.readData(1 << 20, 1500); if (this.lvGen !== gen) break; if (c) parser.push(c); }
-    })();
+      while (this.lvGen === gen && this.alive) {
+        const c = await this.readData(1 << 20, 1500); if (this.lvGen !== gen) break;
+        if (!c) { st.timeouts++; continue; } if (!c.length) { st.empty++; continue; }
+        st.reads++; st.bytes += c.length; st.sizes[c.length] = (st.sizes[c.length] || 0) + 1; parser.push(c);
+      }
+    })().catch(e => this.log('live view reader stopped: ' + e.message));
   }
   async liveStop() {
     this.lvOn = false; this.lvGen = (this.lvGen || 0) + 1; const ack = await this.live(false);
@@ -533,12 +538,13 @@ class LiveParser {
       if (!this.buf) {
         const j = findBytes(c, LIVE_MAGIC, i); if (j < 0 || c.length - j < 24) return;
         const size = new DataView(c.buffer, c.byteOffset + j, 24).getUint32(12, true);
-        if (size < 2048 || size > (64 << 20)) { i = j + 4; continue; }
+        if (size < 2048 || size > (64 << 20)) { this.bad = (this.bad || 0) + 1; i = j + 4; continue; }
+        if (this.lastSize && size !== this.lastSize) this.sizeChanges = (this.sizeChanges || 0) + 1; this.lastSize = size;
         this.buf = new Uint8Array(size); this.fill = 0; i = j;
       }
       const n = Math.min(this.buf.length - this.fill, c.length - i);
       this.buf.set(c.subarray(i, i + n), this.fill); this.fill += n; i += n;
-      if (this.fill === this.buf.length) { const f = this.buf; this.buf = null; this.onFrame(f); }
+      if (this.fill === this.buf.length) { const f = this.buf; this.buf = null; this.frames = (this.frames || 0) + 1; this.onFrame(f); }
     }
   }
 }
@@ -601,7 +607,7 @@ const S = {cam: null, mode: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 41, lv:
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-21c · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-21d · ' + navigator.userAgent);
 $('btnLog').onclick = () => saveFile(new Blob([logLines.join('\n')], {type: 'text/plain'}), 'x1d_log_' + stamp() + '.txt');
 $('logBox').addEventListener('toggle', () => { logEl.textContent = logLines.join('\n'); logEl.scrollTop = 1e9; });
 const say = s => { $('state').textContent = s; };
@@ -845,7 +851,7 @@ $('rel').onclick = async () => {
   } catch (e) { say(e.message); hideProg(); }
   S.busy = false; $('rel').classList.remove('busy');
 };
-let lvFrames = 0, lvT0 = 0, lvBusy = false, lvLast = 0, lvRestarts = 0;
+let lvFrames = 0, lvT0 = 0, lvBusy = false, lvLast = 0, lvRestarts = 0, lvErr = 0, lvBad = 0;
 S.lvChangedAt = 0;
 window.X1D_LOG = () => logLines.join('\n');
 window.X1D_LV = () => ({frames: lvFrames, sinceLast: Math.round(performance.now() - lvLast), lv: S.lv, busy: S.busy, restarts: lvRestarts});
@@ -855,7 +861,11 @@ async function startLive() {
     await S.cam.liveStart(f => {
       lvLast = performance.now();
       if (lvBusy) return; lvBusy = true;
-      requestAnimationFrame(() => { try { if (S.lv && S.real) { renderLiveFrame(f, cv); lvFrames++; if (lvFrames === 1) vfMessage(''); } } finally { lvBusy = false; } });
+      requestAnimationFrame(() => {
+        try { if (S.lv && S.real) { const ok = renderLiveFrame(f, cv); if (!ok) lvBad++; lvFrames++; if (lvFrames === 1) vfMessage(''); } }
+        catch (e) { if (++lvErr <= 3) log('live view draw error: ' + e.message); }
+        finally { lvBusy = false; }
+      });
     });
     S.lv = true; $('ovLv').textContent = 'Live view on';
   } finally { S.lvChanging = false; S.lvChangedAt = performance.now(); }
@@ -864,6 +874,13 @@ async function stopLive() {
   S.lvChanging = true;
   try { if (S.cam) await S.cam.liveStop(); } finally { S.lv = false; S.lvChanging = false; S.lvChangedAt = performance.now(); }
 }
+/* live view status: log every 3 s while it runs, so a saved log shows where the stream stops */
+setInterval(() => {
+  const c = S.cam, st = c && c.lvStats; if (!S.real || !S.lv || !st) return;
+  const p = st.parser, s = (performance.now() - st.t0) / 1000;
+  const line = `live view ${s.toFixed(0)} s: ${(st.bytes / 1e6).toFixed(1)} MB in ${st.reads} reads (${Object.entries(st.sizes).slice(0, 4).map(([k, v]) => k + '×' + v).join(', ')}), ${st.timeouts} timeouts, ${st.empty} empty, frames parsed ${p.frames || 0}, drawn ${lvFrames}, bad ${lvBad}, header skips ${p.bad || 0}, size changes ${p.sizeChanges || 0}, last size ${p.lastSize || '-'}, filling ${p.buf ? p.fill + '/' + p.buf.length : '-'}`;
+  log(line); $('ovShots').textContent = (p.frames || 0) + ' frames · ' + (st.bytes / 1e6 / s).toFixed(0) + ' MB/s';
+}, 3000);
 /* watchdog: if frames stop arriving while live view is on, restart it (at most once every 10 s) */
 setInterval(async () => {
   if (!S.real || !S.lv || !S.cam || S.busy || S.lvChanging || document.hidden) return;
