@@ -34,7 +34,7 @@ button{font:inherit;color:inherit}
 .btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--edge);background:var(--panel);cursor:pointer}
 .btn:hover{border-color:var(--alu2)}.btn:focus-visible,.seg button:focus-visible,.key:focus-visible,.rel:focus-visible,.strip button:focus-visible{outline:2px solid var(--org);outline-offset:2px}
 .btn.alu{background:linear-gradient(#d6d9dc,#b4b8bc);color:#17191b;border-color:#e6e8ea;font-weight:600}
-.app{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,1fr);grid-template-areas:"vf ctl" "ses ctl";grid-template-rows:auto 1fr;gap:16px;align-items:start;padding:16px max(16px,env(safe-area-inset-right)) 16px max(16px,env(safe-area-inset-left));max-width:1400px;margin:0 auto}
+.app{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,1fr);grid-template-areas:"vf ctl" "shot ctl" "ses ctl";grid-template-rows:auto auto 1fr;gap:16px;align-items:start;padding:16px max(16px,env(safe-area-inset-right)) 16px max(16px,env(safe-area-inset-left));max-width:1400px;margin:0 auto}
 .vf{grid-area:vf;position:relative;aspect-ratio:4/3;background:#000;border-radius:14px;overflow:hidden;border:1px solid var(--edge);align-self:start}
 .vf canvas{position:absolute;inset:0;width:100%;height:100%}
 .ov{position:absolute;left:0;right:0;display:flex;align-items:center;gap:14px;padding:10px 14px;font-size:15px;pointer-events:none}
@@ -53,6 +53,7 @@ button{font:inherit;color:inherit}
 @keyframes fl{0%{opacity:1}100%{opacity:0}}
 .ctl{grid-area:ctl;display:flex;flex-direction:column;gap:14px}
 .ses{grid-area:ses}
+.shot{grid-area:shot}
 .card{background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:14px}
 .card h2{margin:0 0 10px;font:600 15px/1.2 var(--ft);color:var(--dim);display:flex;justify-content:space-between;gap:8px}
 .card h2 em{font-style:normal;color:var(--ink)}
@@ -103,7 +104,7 @@ button{font:inherit;color:inherit}
 .modal.on{display:grid}
 .modal .card{max-width:460px;font-size:15px}
 .modal p{margin:0 0 10px}
-@media(max-width:860px){.app{grid-template-columns:minmax(0,1fr);grid-template-areas:"vf" "ctl" "ses";grid-template-rows:auto}.vf{aspect-ratio:4/3}}
+@media(max-width:860px){.app{grid-template-columns:minmax(0,1fr);grid-template-areas:"vf" "shot" "ctl" "ses";grid-template-rows:auto}.vf{aspect-ratio:4/3}}
 @media(max-width:600px){.brand small{display:none}#btnConnect{flex:1}.rel{width:84px;height:84px}.ov{font-size:13px;gap:10px}.meter svg{width:110px}}
 @media(prefers-reduced-motion:reduce){.flash.go{animation:none}}
 </style>
@@ -135,6 +136,18 @@ button{font:inherit;color:inherit}
     </div>
   </section>
 
+  <section class="card shot" aria-label="Shutter">
+    <div class="shoot">
+      <button class="rel" id="rel" aria-label="Release shutter"></button>
+      <div class="opts">
+        <div class="row" style="justify-content:space-between"><span>Delay</span><div class="seg" id="segDelay"><button data-d="0" class="on">Off</button><button data-d="2">2 s</button><button data-d="10">10 s</button></div></div>
+        <div class="row" style="justify-content:space-between"><span>Frames</span><div class="seg" id="segRep"><button data-r="1" class="on">1</button><button data-r="3">3</button><button data-r="10">10</button></div></div>
+      </div>
+    </div>
+    <div class="state" id="state" style="margin-top:10px">Ready</div>
+    <div class="prog" id="prog" hidden><i id="progBar"></i></div>
+  </section>
+
   <section class="ctl">
     <div class="card">
       <h2>Exposure <em id="modeTxt" class="num">Manual</em></h2>
@@ -158,18 +171,6 @@ button{font:inherit;color:inherit}
       </div>
       <div class="fbar" id="fbar"><u id="fdof"></u><i id="fpos"></i></div>
       <div class="fnote"><span>near</span><span id="fsharp">soft</span><span>far</span></div>
-    </div>
-
-    <div class="card">
-      <div class="shoot">
-        <button class="rel" id="rel" aria-label="Release shutter"></button>
-        <div class="opts">
-          <div class="row" style="justify-content:space-between"><span>Delay</span><div class="seg" id="segDelay"><button data-d="0" class="on">Off</button><button data-d="2">2 s</button><button data-d="10">10 s</button></div></div>
-          <div class="row" style="justify-content:space-between"><span>Frames</span><div class="seg" id="segRep"><button data-r="1" class="on">1</button><button data-r="3">3</button><button data-r="10">10</button></div></div>
-        </div>
-      </div>
-      <div class="state" id="state" style="margin-top:10px">Ready</div>
-      <div class="prog" id="prog" hidden><i id="progBar"></i></div>
     </div>
 
     <div class="card">
