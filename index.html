@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141516">
+<title>X1D Remote</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE  a shipped camera-remote app: quiet, exact, nothing decorative
+   IDEA   the X1D's own rear screen and top plate: graphite glass, aluminium keys, one orange release
+   PICTURE the viewfinder itself, live, with the camera's exposure readout laid over it
+   COLOUR graphite ground, warm white ink, brushed aluminium controls, Phocus orange for the release only
+   TYPE   Barlow Semi Condensed for readouts (like the camera's LCD), Barlow for text
+   LAYOUT wide (Fold open, PC): viewfinder left, control column right. Narrow (Fold cover): bar, viewfinder, dials, release */
+:root{color-scheme:dark;--fd:"Barlow Semi Condensed","Arial Narrow","Roboto Condensed",system-ui,sans-serif;--ft:Barlow,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--bg:#141516;--panel:#1d1f21;--edge:#2c2f32;--ink:#f1efe9;--dim:#9a9d9f;--alu:#c9ccd0;--alu2:#8f9397;--org:#f26b1d;--ok:#5fc27a;--warn:#e5b33f;--bad:#e8584a}
+:root[data-theme=light]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--ft);overflow-x:clip;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit}
+.num{font-family:var(--fd);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left));border-bottom:1px solid var(--edge)}
+.brand{font:700 20px/1 var(--fd);letter-spacing:.02em;margin-right:auto}
+.brand small{font:500 13px var(--ft);color:var(--dim);margin-left:8px;letter-spacing:0}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--panel);border:1px solid var(--edge);font-size:14px;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--warn)}
+.pill.usb .dot{background:var(--ok)}.pill.off .dot{background:var(--bad)}
+.batt{display:inline-flex;align-items:center;gap:6px;font-size:15px}
+.batt i{display:inline-block;width:26px;height:12px;border:1.5px solid var(--alu2);border-radius:3px;position:relative}
+.batt i::after{content:"";position:absolute;right:-4px;top:3px;width:2px;height:4px;background:var(--alu2)}
+.batt b{position:absolute;left:1.5px;top:1.5px;bottom:1.5px;background:var(--alu);border-radius:1px}
+.btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--edge);background:var(--panel);cursor:pointer}
+.btn:hover{border-color:var(--alu2)}.btn:focus-visible,.seg button:focus-visible,.key:focus-visible,.rel:focus-visible,.strip button:focus-visible{outline:2px solid var(--org);outline-offset:2px}
+.btn.alu{background:linear-gradient(#d6d9dc,#b4b8bc);color:#17191b;border-color:#e6e8ea;font-weight:600}
+.app{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,1fr);grid-template-areas:"vf ctl" "ses ctl";grid-template-rows:auto 1fr;gap:16px;align-items:start;padding:16px max(16px,env(safe-area-inset-right)) 16px max(16px,env(safe-area-inset-left));max-width:1400px;margin:0 auto}
+.vf{grid-area:vf;position:relative;aspect-ratio:4/3;background:#000;border-radius:14px;overflow:hidden;border:1px solid var(--edge);align-self:start}
+.vf canvas{position:absolute;inset:0;width:100%;height:100%}
+.ov{position:absolute;left:0;right:0;display:flex;align-items:center;gap:14px;padding:10px 14px;font-size:15px;pointer-events:none}
+.ov.top{top:0;background:linear-gradient(rgba(0,0,0,.55),transparent)}
+.ov.bot{bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.65));padding-top:28px;flex-wrap:wrap}
+.lvb{pointer-events:auto;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid rgba(241,239,233,.5);background:rgba(0,0,0,.35);font-size:14px;cursor:pointer}
+.mode{font:700 22px/1 var(--fd);border:1.5px solid var(--ink);border-radius:5px;padding:1px 7px}
+.ro{font:600 clamp(20px,3.2vw,30px)/1 var(--fd);white-space:nowrap}
+.ro span{color:var(--dim);font-size:.6em;margin-right:3px;font-weight:500}
+.meter{margin-left:auto;display:flex;flex-direction:column;align-items:center;gap:3px}
+.meter svg{width:150px;height:22px}
+.msg{position:absolute;inset:0;display:none;place-items:center;text-align:center;padding:24px;color:var(--dim);font-size:15px;background:#0b0b0c}
+.msg.on{display:grid}
+.flash{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none}
+.flash.go{animation:fl .45s ease-out}
+@keyframes fl{0%{opacity:1}100%{opacity:0}}
+.ctl{grid-area:ctl;display:flex;flex-direction:column;gap:14px}
+.ses{grid-area:ses}
+.card{background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:14px}
+.card h2{margin:0 0 10px;font:600 15px/1.2 var(--ft);color:var(--dim);display:flex;justify-content:space-between;gap:8px}
+.card h2 em{font-style:normal;color:var(--ink)}
+.dial{margin-bottom:10px}.dial:last-child{margin-bottom:0}
+.dial .lab{display:flex;justify-content:space-between;font-size:14px;color:var(--dim);margin-bottom:4px}
+.dial .lab b{color:var(--ink);font:600 17px var(--fd)}
+.strip{position:relative;display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 2px 6px;scrollbar-width:thin}
+.strip button{flex:none;scroll-snap-align:center;min-width:52px;height:44px;padding:0 10px;border-radius:9px;border:1px solid var(--edge);background:#17181a;font:600 17px var(--fd);cursor:pointer;white-space:nowrap}
+.strip button.on{background:var(--alu);color:#141516;border-color:var(--alu)}
+.dial.lock .strip{opacity:.38;pointer-events:none}
+.dial.lock .lab::after{content:"set by camera";font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.key{min-width:56px;height:52px;border-radius:12px;border:1px solid #e6e8ea;background:linear-gradient(#d9dcdf,#b2b6ba);color:#17191b;font:700 20px var(--fd);cursor:pointer;flex:1}
+.key:active{transform:translateY(1px);background:linear-gradient(#c3c6ca,#a7abaf)}
+.seg{display:flex;border:1px solid var(--edge);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:transparent;min-height:40px;padding:0 12px;font-size:14px;cursor:pointer;white-space:nowrap}
+.seg button.on{background:#2f3236;color:var(--ink)}
+.fbar{height:6px;border-radius:3px;background:#2a2c2f;position:relative;margin:12px 0 4px}
+.fbar i{position:absolute;top:-4px;width:3px;height:14px;background:var(--ink);border-radius:2px;transform:translateX(-1px)}
+.fbar u{position:absolute;top:0;height:6px;border-radius:3px;background:rgba(95,194,122,.35)}
+.fnote{display:flex;justify-content:space-between;font-size:13px;color:var(--dim)}
+.shoot{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}
+.rel{width:96px;height:96px;border-radius:50%;border:5px solid #2b2d30;background:radial-gradient(circle at 40% 35%,#ff9a5c,var(--org) 55%,#c4500f);box-shadow:inset 0 -4px 0 rgba(0,0,0,.25),0 0 0 2px #3a3d41;cursor:pointer}
+.rel:active,.rel.busy{transform:scale(.96);filter:brightness(.85)}
+.opts{display:flex;flex-direction:column;gap:8px;font-size:14px}
+.opts label{display:flex;align-items:center;gap:8px;min-height:32px}
+.opts input[type=checkbox]{width:20px;height:20px;accent-color:var(--org)}
+.state{font-size:14px;color:var(--dim);min-height:21px}
+.caps{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.cap{flex:none;width:112px;font-size:12.5px;color:var(--dim)}
+.cap .th{width:112px;aspect-ratio:4/3;border-radius:8px;background:#0b0b0c center/cover;border:1px solid var(--edge);display:grid;place-items:center;color:var(--dim)}
+.cap b{color:var(--ink);font:600 14px var(--fd);display:block;margin-top:4px}
+.cap a{color:var(--org)}
+.empty{font-size:14px;color:var(--dim)}
+.cap .th img{width:100%;height:100%;object-fit:cover;border-radius:7px}
+.cap .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.cap .acts a,.cap .acts button{font-size:12.5px;color:var(--org);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline}
+.prog{height:4px;border-radius:2px;background:#2a2c2f;margin-top:6px;overflow:hidden}.prog i{display:block;height:100%;width:0;background:var(--org)}
+#cardBox{margin-top:12px;font-size:14px}#cardBox summary{cursor:pointer;color:var(--dim);min-height:28px}
+#cardList{max-height:220px;overflow:auto;font:13px/1.5 ui-monospace,Consolas,monospace;color:#c8cacc;margin-top:6px}
+.chk{display:flex;align-items:center;gap:8px;min-height:36px;font-size:14px}.chk input{width:20px;height:20px;accent-color:var(--org)}
+.log{margin:0 auto 24px;max-width:1400px;padding:0 max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
+.log details{background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:10px 14px}
+.log summary{cursor:pointer;color:var(--dim);font-size:14px;min-height:28px}
+.log pre{max-height:260px;overflow:auto;font:12.5px/1.45 ui-monospace,Consolas,monospace;color:#c8cacc;margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.foot{font-size:13px;color:var(--dim);margin-top:8px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;place-items:center;padding:16px;z-index:5}
+.modal.on{display:grid}
+.modal .card{max-width:460px;font-size:15px}
+.modal p{margin:0 0 10px}
+@media(max-width:860px){.app{grid-template-columns:minmax(0,1fr);grid-template-areas:"vf" "ctl" "ses";grid-template-rows:auto}.vf{aspect-ratio:4/3}}
+@media(max-width:600px){.brand small{display:none}#btnConnect{flex:1}.rel{width:84px;height:84px}.ov{font-size:13px;gap:10px}.meter svg{width:110px}}
+@media(prefers-reduced-motion:reduce){.flash.go{animation:none}}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="brand">X1D Remote <small>for Hasselblad X1D-50c</small></div>
+  <span class="pill" id="conn"><span class="dot"></span><span id="connTxt">Demo camera</span></span>
+  <span class="batt num" id="batt" title="Camera battery"><i><b id="battFill" style="width:40%"></b></i><span id="battTxt">41%</span></span>
+  <button class="btn alu" id="btnConnect">Connect camera</button>
+</header>
+
+<main class="app">
+  <section class="vf" id="vf" aria-label="Viewfinder">
+    <canvas id="cv"></canvas>
+    <div class="flash" id="flash"></div>
+    <div class="msg" id="vfMsg"></div>
+    <div class="ov top num">
+      <span class="mode" id="ovMode">M</span>
+      <span id="ovLens">XCD 90 mm</span>
+      <span id="ovShots" style="margin-left:auto">8 in buffer</span>
+      <button type="button" id="ovLv" class="lvb">Live view</button>
+    </div>
+    <div class="ov bot">
+      <span class="ro num"><span>s</span><b id="roS">1/60</b></span>
+      <span class="ro num"><span>f</span><b id="roA">5.6</b></span>
+      <span class="ro num"><span>ISO</span><b id="roI">400</b></span>
+      <span class="meter num"><svg id="meter" viewBox="0 0 150 22" aria-label="Exposure meter"></svg><span id="meterTxt" style="font-size:13px">±0.0</span></span>
+    </div>
+  </section>
+
+  <section class="ctl">
+    <div class="card">
+      <h2>Exposure <em id="modeTxt" class="num">Manual</em></h2>
+      <div class="dial" id="dS"><div class="lab"><span>Shutter</span><b class="num" id="lS"></b></div><div class="strip" id="sS"></div></div>
+      <div class="dial" id="dA"><div class="lab"><span>Aperture</span><b class="num" id="lA"></b></div><div class="strip" id="sA"></div></div>
+      <div class="dial" id="dI"><div class="lab"><span>ISO</span><b class="num" id="lI"></b></div><div class="strip" id="sI"></div></div>
+      <div class="row" id="demoMode" style="margin-top:10px"><span style="font-size:14px;color:var(--dim)">Body mode dial (demo)</span>
+        <div class="seg" id="segMode"><button data-m="0" class="on">M</button><button data-m="1">A</button><button data-m="2">S</button><button data-m="3">P</button></div></div>
+    </div>
+
+    <div class="card">
+      <h2>Focus <em class="num" id="focTxt">manual</em></h2>
+      <div class="row">
+        <button class="key" id="fMinus" aria-label="Focus closer">−</button>
+        <button class="key" id="fAF">AF</button>
+        <button class="key" id="fPlus" aria-label="Focus further">+</button>
+      </div>
+      <div class="row" style="margin-top:10px;justify-content:space-between">
+        <span style="font-size:14px;color:var(--dim)">Step size</span>
+        <div class="seg" id="segStep"><button data-s="25">Fine</button><button data-s="125" class="on">Medium</button><button data-s="500">Coarse</button></div>
+      </div>
+      <div class="fbar" id="fbar"><u id="fdof"></u><i id="fpos"></i></div>
+      <div class="fnote"><span>near</span><span id="fsharp">soft</span><span>far</span></div>
+    </div>
+
+    <div class="card">
+      <div class="shoot">
+        <button class="rel" id="rel" aria-label="Release shutter"></button>
+        <div class="opts">
+          <div class="row" style="justify-content:space-between"><span>Delay</span><div class="seg" id="segDelay"><button data-d="0" class="on">Off</button><button data-d="2">2 s</button><button data-d="10">10 s</button></div></div>
+          <div class="row" style="justify-content:space-between"><span>Frames</span><div class="seg" id="segRep"><button data-r="1" class="on">1</button><button data-r="3">3</button><button data-r="10">10</button></div></div>
+        </div>
+      </div>
+      <div class="state" id="state" style="margin-top:10px">Ready</div>
+      <div class="prog" id="prog" hidden><i id="progBar"></i></div>
+    </div>
+
+    <div class="card">
+      <h2>Import to this device <em id="impTxt" class="num">RAW + JPEG</em></h2>
+      <div class="row" style="justify-content:space-between"><span style="font-size:14px">Copy each shot as</span>
+        <div class="seg" id="segImp"><button data-i="raw">RAW</button><button data-i="both" class="on">RAW + JPEG</button><button data-i="jpeg">JPEG</button></div></div>
+      <label class="chk"><input type="checkbox" id="chkSave" checked> Save to Downloads automatically</label>
+      <label class="chk"><input type="checkbox" id="chkBody" checked> Also import shots taken on the camera</label>
+      <div class="foot" id="impNote">RAW is the full 110 MB 3FR, saved to Downloads (your gallery won't show 3FR files; open them from Files or Lightroom). JPEG is the 1440 × 1080 preview the camera stores inside every RAW, for quick sharing.</div>
+    </div>
+
+  </section>
+
+  <section class="card ses">
+    <h2>This session <em class="num" id="capCount">0 shots</em></h2>
+    <div class="caps" id="caps"><span class="empty">Photos you take appear here.</span></div>
+    <details id="cardBox"><summary>On the camera's card <span id="cardCount" class="num"></span></summary>
+      <div class="foot">Listed when you connect. Copying photos taken earlier isn't supported yet.</div>
+      <div id="cardList"></div></details>
+  </section>
+</main>
+
+<div class="log">
+  <details id="logBox"><summary>Protocol log</summary><button class="btn" id="btnLog" style="margin-top:8px">Save log as a file</button><pre id="log"></pre></details>
+  <div class="foot">Demo mode simulates the camera using the settings tables, replies and events recorded from a real X1D-50c (firmware 1.25.0). Live view in demo mode is a drawn scene. With the real camera, live view is the camera's own 2816 × 1260 sensor stream, decoded here (about 5 frames a second).</div>
+</div>
+
+<div class="modal" id="modal"><div class="card"><div id="modalBody"></div><button class="btn alu" id="modalOk" style="margin-top:6px">OK</button></div></div>
+
+<script>
+{
+/* ============================== protocol ============================== */
+const VID = 0x2756, PID = 0x0002, PKT = 512;
+const OP = {ACTION:1, READ:2, WRITE:3, INDEXED:4, LIST:5, DESCRIBE:6, BULK:7};
+const P = {MODE:0x03, APERTURE:0x08, SHUTTER:0x09, ISO:0x0a, FIRMWARE:0x1b, MODEL:0x25, SERIAL:0x27, FOCAL:0x2e, BATTERY:0x2f, LIVE:0x35, LENS:0x3d, DRIVE:0x41, LEFT:0x49, TETHER:0x7a};
+const A = {RELEASE:1, AF:2, FOCUS:3, SESSION:4, LIVE:7, RELEASE_IMG:9};
+const MODES = {0:'Manual', 1:'Aperture priority', 2:'Shutter priority', 3:'Program', 9:'Full auto', 10:'Video'};
+const MODE_LETTER = {0:'M', 1:'A', 2:'S', 3:'P', 9:'FA', 10:'V'};
+const APERTURES = [[0x20,0xa,'3.2'],[0x22,0xa,'3.4'],[4,1,'4'],[0x30,0xa,'4.8'],[0x38,0xa,'5.6'],[0x44,0xa,'6.8'],[8,1,'8'],[0x5f,0xa,'9.5'],[11,1,'11'],[13,1,'13'],[16,1,'16'],[19,1,'19'],[22,1,'22'],[27,1,'27'],[32,1,'32']];
+const SH_RAW = 'ff00001,b500001,8000001,5a80001,4000001,2d40001,2000001,16a0001,1000001,b50001,800001,5b0001,400001,2d0001,200001,170001,100001,b0001,80001,60001,40001,30001,20001,e000a,30000,10000,10001,7000a,5000a,3000a,10004,10006,10008,1000a,1000f,10014,1001e,1002d,1003c,1005a,1007d,100b4,100fa,1015e,101f4,102ee,103e8,105dc,107d0'.split(',');
+const SH_NAME = '1:08|48:16|34:08|24:08|17:04|12:04|8:32|6:02|4:16|3:01|2:08|1:31|1:04|45|32|23|16|11|8.0|6.0|4.0|3.0|2.0|1.4|T|B|1.0|0.7|0.5|0.3|1/4|1/6|1/8|1/10|1/15|1/20|1/30|1/45|1/60|1/90|1/125|1/180|1/250|1/350|1/500|1/750|1/1000|1/1500|1/2000'.split('|');
+const SHUTTERS = SH_RAW.map((h,i) => ({v:parseInt(h,16), name:SH_NAME[i]}));
+const ISOS = [100,200,400,800,1600,3200,6400,12800,25600];
+const PHOCUS_CONNECT = '5:-: 3:7a:49322c312c31 1:4:000000 2:11: 6:2: 6:3: 6:4: 6:6: 6:7: 2:17: 6:8: 6:9: 6:a: 6:e: 6:f: 6:10: 6:11: 6:12: 6:13: 6:17: 6:19: 6:1b: 6:1c: 6:24: 6:25: 6:27: 6:28: 6:29: 6:2b: 6:2d: 6:2e: 6:2f: 6:30: 6:33: 6:34: 6:35: 6:3d: 6:43: 6:44: 6:45: 6:46: 6:47: 6:48: 6:49: 2:17: 6:3e: 6:3f: 6:39: 2:40: 2:11: 1:e:3200 2:79: 2:10: 2:e: 4:7: 2:94: 1:e:3200 2:a: 2:8: 2:9: 2:1b: 2:25: 2:27: 4:7: 6:1a: 2:3d: 2:4e: 2:4f: 2:31: 2:29: 7:9:0000000000000000000054442a00 3:46:6937 3:47:6935303030 3:48:6930 2:2: 2:2f: 6:41: 2:41: 2:4e: 2:4f: 2:4e: 2:4f: 2:4e: 2:4f: 2:4e: 2:4f: 2:4e: 2:4f: 2:94: 2:94: 2:95: 2:35: 4:1:07000000 4:1:07000000 4:1:08000000 2:41: 2:94: 4:1:07000000 4:1:07000000 4:1:08000000 2:41: 2:94: 3:30:49322c353030302c30 3:7a:49322c312c30 1:4:010000 2:16: 2:2b: 7:2:0000010000000000000000040000 4:7:01 4:1:08000000 4:1:09000000 4:7: 4:7:02 2:89: 2:81: 2:8c: 2:41: 2:8e: 3:93:49332c302c312c32 2:82: 6:8d: 6:91: 6:8f: 6:93: 6:83: 4:1:07000000 4:1:07000000 4:1:08000000 2:41: 2:94: 2:94: 2:95: 2:35: 6:5c: 4:3: 4:2: 4:1:07000000 4:1:08000000 6:2c: 2:3: 4:1:07000000 4:1:07000000 4:1:08000000 2:7: 2:6: 3:7:6662666630303030303030303030303030 2:41:';
+const te = new TextEncoder(), td = new TextDecoder('latin1');
+const unhex = h => { const o = new Uint8Array(h.length >> 1); for (let i = 0; i < o.length; i++) o[i] = parseInt(h.substr(i * 2, 2), 16); return o; };
+const CARD_LIST_BYTES = Math.ceil(2770004 / 512) * 512;   // what the camera sends for op 7 code 9
+
+const u8 = (...parts) => { const n = parts.reduce((s,p)=>s+p.length,0), o = new Uint8Array(n); let i = 0; for (const p of parts) { o.set(p,i); i += p.length; } return o; };
+const le32 = v => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, v>>>0, true); return b; };
+const le16 = v => { const b = new Uint8Array(2); new DataView(b.buffer).setUint16(0, v&0xffff, true); return b; };
+const hex = b => Array.from(b, x => x.toString(16).padStart(2,'0')).join('');
+
+function encodeFrame(seq, op, code, value = new Uint8Array()) {
+  const body = u8(le16(seq), [op], code == null ? [] : le16(code), value);
+  return u8([4,0,8,5], le32(9 + body.length), [0, seq & 0xff], le32(body.length), body);
+}
+function frameReply(seq, op, payload) {           // camera -> host (used by the simulator)
+  const body = u8(le16(seq), [op], payload);
+  const f = u8([3,0,5,8], le32(9 + body.length), [0, seq & 0xff], le32(body.length), body);
+  if (f.length <= 260) { const p = new Uint8Array(PKT); p.set(f); return [p]; }
+  const out = []; const first = new Uint8Array(PKT); first.set(u8([3,0,5,8], le32(255), f.subarray(8,260))); out.push(first);
+  let off = 260; while (off < f.length) { const c = f.subarray(off, off + PKT - 10); off += c.length; const p = new Uint8Array(PKT); p.set(u8([3,0,5,8], le32(off), [0, seq & 0xff], c)); out.push(p); }
+  return out;
+}
+class Reassembler {
+  constructor(){ this.pend = null; }
+  feed(p) {
+    const out = [];
+    if (p.length < 10 || p[0] !== 3 || p[1] !== 0 || p[2] !== 5 || p[3] !== 8) return out;
+    const dv = new DataView(p.buffer, p.byteOffset, p.byteLength);
+    if (this.pend) {
+      const need = this.pend.n - this.pend.buf.length;
+      this.pend.buf = u8(this.pend.buf, p.subarray(10, 10 + need));
+      if (this.pend.buf.length >= this.pend.n) { out.push(Reassembler.fin(this.pend.buf)); this.pend = null; }
+      return out;
+    }
+    if (p.length < 17) return out;
+    const len = dv.getUint32(4, true), n = dv.getUint32(10, true);
+    const buf = p.slice(14, Math.min(p.length, 5 + len));
+    if (buf.length < n) this.pend = {n, buf}; else out.push(Reassembler.fin(buf.subarray(0, n)));
+    return out;
+  }
+  static fin(b) { return {seq: b[0] | (b[1] << 8), op: b[2], payload: b.slice(3)}; }
+}
+function decodeTyped(b) {
+  const s = typeof b === 'string' ? b : td.decode(b); if (!s) return null;
+  const t = s[0], r = s.slice(1);
+  if (t === 'i') return parseInt(r, 10);
+  if (t === 'f') { const dv = new DataView(new ArrayBuffer(8)); const h = r.padStart(16,'0'); for (let i=0;i<8;i++) dv.setUint8(i, parseInt(h.substr(i*2,2),16)); return dv.getFloat64(0); }
+  if (t === 'r') { const v = parseInt(r, 16); return {num: v >>> 16, den: v & 0xffff, packed: v}; }
+  if (t === 'S') return r.slice(r.indexOf(',') + 1);
+  return s;
+}
+const encInt = v => te.encode('i' + v);
+const encDouble = v => { const dv = new DataView(new ArrayBuffer(8)); dv.setFloat64(0, v); return te.encode('f' + hex(new Uint8Array(dv.buffer))); };
+const encRational = (num, den) => te.encode('r' + (((num << 16) | den) >>> 0).toString(16));
+const shutterName = r => (SHUTTERS.find(s => s.v === r.packed) || {name: r.packed === 0x7fffffff ? 'auto' : r.num + '/' + r.den}).name;
+const apertureName = r => (APERTURES.find(a => a[0] === r.num && a[1] === r.den) || [0,0,(r.num/r.den).toFixed(1)])[2];
+const shutterSeconds = name => name === 'B' || name === 'T' ? 1 : name.includes(':') ? name.split(':').reduce((m,x)=>m*60+ +x,0) : name.includes('/') ? 1 / +name.split('/')[1] : +name;
+
+/* ============================== transports ============================== */
+class SimTransport {
+  constructor() {
+    this.kind = 'demo'; this.q = []; this.waiters = []; this.data = []; this.dataWaiters = [];
+    this.vals = {[P.MODE]:'i0', [P.APERTURE]:'r38000a', [P.SHUTTER]:'r1003c', [P.ISO]:'f4079000000000000', [P.FIRMWARE]:'S10,v1.25.0-42', [P.MODEL]:'S18,Hasselblad X1D-50c', [P.SERIAL]:'S10,DEMO000001', [P.FOCAL]:'i90', [P.BATTERY]:'i41', [P.LENS]:'i1', [P.LIVE]:'i1', [P.LEFT]:'i8', [P.DRIVE]:'i0', [P.TETHER]:'I2,1,1'};
+    this.token = 0x0610; this.evseq = 60;
+  }
+  async open() {}
+  push(pkts) { for (const p of pkts) { const w = this.waiters.shift(); w ? w(p) : this.q.push(p); } }
+  reply(seq, op, payload) { setTimeout(() => this.push(frameReply(seq, op, payload)), 18 + Math.random() * 14); }
+  event(op, payload, delay = 30) { setTimeout(() => this.push(frameReply(++this.evseq & 0xffff, op, payload)), delay); }
+  setVal(code, s) { this.vals[code] = s; this.event(0x42, u8([code], te.encode(s))); }
+  async transferOut(ep, data) {
+    const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const n = dv.getUint32(10, true), seq = dv.getUint16(14, true), op = data[16];
+    const code = n >= 5 ? dv.getUint16(17, true) : null, val = data.slice(19, 14 + n);
+    const ack = v => le32(v);
+    if (op === OP.LIST) this.reply(seq, 0x85, u8(...Object.keys(this.vals).map(k => le16(+k))));
+    else if (op === OP.READ) this.reply(seq, 0x82, te.encode(this.vals[code] || ''));
+    else if (op === OP.DESCRIBE) this.reply(seq, 0x86, te.encode('\x01\x00MLi0,0,0'));
+    else if (op === OP.WRITE) {
+      const s = td.decode(val);
+      if ([P.ISO, P.APERTURE, P.SHUTTER].includes(code)) this.setVal(code, s); else this.vals[code] = s;
+      this.reply(seq, 0x83, ack(code === P.TETHER || code === P.DRIVE ? 13 : 0));
+    } else if (op === OP.ACTION) {
+      this.reply(seq, 0x81, ack(0));
+      if (code === A.RELEASE) {
+        const secs = shutterSeconds(shutterName(decodeTyped(this.vals[P.SHUTTER])));
+        this.token++; const tok = this.token;
+        this.event(0x42, u8([0x2d], te.encode('i1')), 120);
+        this.event(0x40, u8([4], le32(tok), le32(110379008), [3], te.encode('3FR'), [0]), 900 + Math.min(secs, 4) * 1000);
+      } else if (code === A.RELEASE_IMG) {
+        this.event(0x42, u8([0x2d], te.encode('i0')), 40);
+      } else if (code === A.LIVE) {
+        this.setVal(P.LIVE, val[0] ? 'i1' : 'i0');
+      }
+    } else if (op === OP.BULK) {
+      this.reply(seq, 0x87, ack(0));
+      if (code === 4) this.fakeDownload();
+      if (code === 2) this.pushData([new Uint8Array(1024)], 30);
+      if (code === 9) this.pushData(SimTransport.cardList(), 40);
+    } else this.reply(seq, op | 0x80, ack(0));
+  }
+  pushData(blocks, gap) { blocks.forEach((b, i) => setTimeout(() => { const w = this.dataWaiters.shift(); w ? w(b) : this.data.push(b); }, 40 + i * gap)); }
+  static cardList() {                       // same shape as the real listing: size bytes, then length-prefixed paths
+    const out = new Uint8Array(CARD_LIST_BYTES); let o = 0;
+    const add = s => { out.set([0x00,0x40,0x94,0x06], o); o += 4; out[o++] = s.length; out.set(te.encode(s), o); o += s.length; };
+    add('/SD0/DCIM'); add('/SD0/DCIM/146HASBL');
+    for (let n = 160; n <= 195; n++) { const b = 'B0000' + n; add(`/SD0/DCIM/146HASBL/${b}.3FR`); add(`/SD0/DCIM/146HASBL/${b}.JPG`); }
+    return [out.subarray(0, 2 << 20), out.subarray(2 << 20)];
+  }
+  fakeDownload() {                          // a 110 MB 3FR: real TIFF header + 1440x1080 preview drawn from the demo scene, zeros after
+    const size = 110379008, head = SimTransport.fake3FRHead(), blocks = [];
+    for (let off = 0; off < size; off += (2 << 20)) { const n = Math.min(2 << 20, size - off); blocks.push(off < head.length ? head.subarray(off, off + n) : SimTransport.zero.subarray(0, n)); }
+    this.pushData(blocks, 22);
+  }
+  static zero = new Uint8Array(2 << 20);
+  static fake3FRHead() {
+    const W = 1440, H = 1080, OFF = 7680, head = new Uint8Array(6 << 20), dv = new DataView(head.buffer);
+    head.set([0x49,0x49,0x2a,0,8,0,0,0]);
+    const tags = [[256,4,W],[257,4,H],[258,3,200],[259,3,1],[262,3,2],[273,4,OFF],[277,3,3],[278,4,H],[279,4,W*H*3]];
+    dv.setUint16(8, tags.length, true);
+    tags.forEach(([t, ty, v], i) => { const e = 10 + 12 * i; dv.setUint16(e, t, true); dv.setUint16(e + 2, ty, true); dv.setUint32(e + 4, t === 258 ? 3 : 1, true); ty === 3 && t !== 258 ? dv.setUint16(e + 8, v, true) : dv.setUint32(e + 8, v, true); });
+    dv.setUint16(200, 8, true); dv.setUint16(202, 8, true); dv.setUint16(204, 8, true);
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+    g.drawImage(cv, 0, 0, W, H); const px = g.getImageData(0, 0, W, H).data;
+    for (let i = 0, j = OFF; i < W * H; i++, j += 3) { head[j] = px[i * 4]; head[j + 1] = px[i * 4 + 1]; head[j + 2] = px[i * 4 + 2]; }
+    return head;
+  }
+  async transferIn(ep, len) {
+    if (ep === 2) return new Promise(res => { const p = this.q.shift(); p ? res(p) : this.waiters.push(res); });
+    return new Promise(res => { const d = this.data.shift(); d ? res(d) : this.dataWaiters.push(res); });
+  }
+  dialTurn(code, s) { this.setVal(code, s); }
+  async close() {}
+}
+
+class UsbTransport {
+  constructor(dev) { this.dev = dev; this.kind = 'usb'; }
+  static async request() {
+    const dev = await navigator.usb.requestDevice({filters: [{vendorId: VID, productId: PID}]});
+    const t = new UsbTransport(dev); await t.open(); return t;
+  }
+  async open() { await this.dev.open(); if (this.dev.configuration === null) await this.dev.selectConfiguration(1); await this.dev.claimInterface(0); }
+  async transferOut(ep, data) { await this.dev.transferOut(ep, data); }
+  async transferIn(ep, len) { const r = await this.dev.transferIn(ep, len); return new Uint8Array(r.data.buffer, r.data.byteOffset, r.data.byteLength); }
+  async close() { try { await this.dev.releaseInterface(0); await this.dev.close(); } catch (e) {} }
+}
+
+/* ============================== camera ============================== */
+class Camera {
+  constructor(t, log) { this.t = t; this.log = log; this.seq = 0; this.asm = new Reassembler(); this.pending = new Map(); this.onEvent = () => {}; this.alive = true; this.chain = Promise.resolve(); this.orphan = null; this.lvOn = false; this.cardPaths = []; this.readLoop(); }
+  async readLoop() {
+    while (this.alive) {
+      let p; try { p = await this.t.transferIn(2, PKT); } catch (e) { if (this.alive) { this.alive = false; this.stopKeepAlive(); this.onEvent({type:'lost', error: String(e)}); } return; }
+      for (const f of this.asm.feed(p)) {
+        if (f.op >= 0x40 && f.op <= 0x4f) { const ev = Camera.event(f.op, f.payload); this.log('← event ' + JSON.stringify(ev)); this.onEvent(ev); }
+        else { const w = this.pending.get(f.seq); if (w) { this.pending.delete(f.seq); w(f); } }
+      }
+    }
+  }
+  static event(op, b) {
+    if (op === 0x40 && b.length >= 9) { const dv = new DataView(b.buffer, b.byteOffset); return {type:'image', token: dv.getUint32(1, true), size: dv.getUint32(5, true), format: td.decode(b.slice(10, 10 + (b[9] || 0)))}; }
+    if (op === 0x42 && b.length) return {type:'changed', code: b[0], value: decodeTyped(b.slice(1))};
+    return {type:'event', op};
+  }
+  call(op, code = null, value = new Uint8Array(), timeout = 4000, quiet = false) {
+    const run = async () => {
+      const seq = this.seq; this.seq = (this.seq + 1) & 0xffff;
+      const frame = encodeFrame(seq, op, code, value);
+      if (!quiet) this.log('→ op ' + op + (code != null ? ' code 0x' + code.toString(16).padStart(2,'0') : '') + (value.length ? ' ' + (td.decode(value).match(/^[\x20-\x7e]+$/) ? td.decode(value) : hex(value)) : ''));
+      const got = new Promise((res, rej) => { this.pending.set(seq, res); setTimeout(() => { if (this.pending.delete(seq)) rej(new Error('No reply from camera (op ' + op + ')')); }, timeout); });
+      await this.t.transferOut(2, frame);
+      const f = await got;
+      if (!quiet && f.payload.length === 4 && op !== OP.READ) this.log('   ack ' + new DataView(f.payload.buffer, f.payload.byteOffset).getUint32(0, true));
+      return f.payload;
+    };
+    const p = this.chain.then(run, run); this.chain = p.catch(() => {}); return p;
+  }
+  static ack(p) { return p && p.length >= 4 ? new DataView(p.buffer, p.byteOffset).getUint32(0, true) : null; }
+  async read(code) { return decodeTyped(await this.call(OP.READ, code)); }
+  async write(code, bytes) { return Camera.ack(await this.call(OP.WRITE, code, bytes)); }
+  action(code, value = new Uint8Array()) { return this.call(OP.ACTION, code, value); }
+
+  /* --- data endpoint 0x81. WebUSB reads have no timeout, so every read is raced against one;
+         a read still waiting when we give up is kept and handed to the next reader ("orphan"). --- */
+  readData(n, ms = 8000) {
+    const src = this.orphan || this.t.transferIn(1, n); this.orphan = null;
+    return new Promise(res => { let done = false;
+      const tm = setTimeout(() => { if (!done) { done = true; this.orphan = src; res(null); } }, ms);
+      src.then(c => { if (!done) { done = true; clearTimeout(tm); res(c); } }, () => { if (!done) { done = true; clearTimeout(tm); res(null); } });
+    });
+  }
+  async readExact(total, ms = 8000) {
+    const parts = []; let got = 0;
+    while (got < total) { const c = await this.readData(Math.min(2 << 20, total - got), ms); if (!c || !c.length) break; parts.push(c); got += c.length; }
+    return {got, parts};
+  }
+
+  /* --- connect exactly as Phocus 4.2 does (recorded 21 Nov 2026), then keep the camera polled --- */
+  async connect(progress = () => {}) {
+    const last = {}, items = PHOCUS_CONNECT.trim().split(/\s+/);
+    for (let i = 0; i < items.length; i++) {
+      const [o, c, v] = items[i].split(':'); const op = +o, code = c === '-' ? null : parseInt(c, 16);
+      let val = unhex(v);
+      if (op === OP.WRITE && code === 0x07 && last[7] && last[7].length) val = last[7];   // EV: write back what the camera reported
+      let r; try { r = await this.call(op, code, val, 4000, op === OP.READ || op === OP.DESCRIBE || op === OP.INDEXED); } catch (e) { this.log('connect step ' + i + ': ' + e.message); continue; }
+      if (op === OP.READ) last[code] = r;
+      if (op === OP.LIST) this.codes = r;
+      if (op === OP.BULK && code === 9) { const {got, parts} = await this.readExact(CARD_LIST_BYTES, 6000); this.cardPaths = parseCardList(parts); this.log(`card listing: ${got} bytes, ${this.cardPaths.length} entries`); }
+      if (op === OP.BULK && code === 2) { const {got} = await this.readExact(1024, 4000); this.log('calibration block: ' + got + ' bytes'); }
+      progress((i + 1) / items.length);
+    }
+    this.startKeepAlive();
+  }
+  startKeepAlive() {
+    this.stopKeepAlive(); let n = 0, busy = false;
+    this.ka = setInterval(async () => {
+      if (busy || !this.alive) return; busy = true;
+      try { await this.call(OP.READ, 0x94, undefined, 3000, true); if (++n % 4 === 0) { await this.call(OP.READ, 0x95, undefined, 3000, true); await this.call(OP.READ, P.LIVE, undefined, 3000, true); } } catch (e) {}
+      busy = false;
+    }, 250);
+  }
+  stopKeepAlive() { if (this.ka) clearInterval(this.ka); this.ka = null; }
+  async disconnect() {
+    this.stopKeepAlive();
+    try { if (this.lvOn) await this.liveStop(); for (let i = 0; i < 2; i++) { await this.write(P.TETHER, te.encode('I2,0,1')); await this.action(A.SESSION, new Uint8Array([0,0,1])); } } catch (e) {}
+    this.alive = false; await this.t.close();
+  }
+  focus(steps) { const b = new Uint8Array(4); new DataView(b.buffer).setInt32(0, steps, true); return this.action(A.FOCUS, b); }
+  async live(on) { const b = new Uint8Array(10); b[0] = on ? 1 : 0; return Camera.ack(await this.action(A.LIVE, b)); }
+
+  /* --- shutter, as Phocus: read drive mode, set single, release --- */
+  async release() { await this.call(OP.READ, P.DRIVE).catch(() => {}); await this.write(P.DRIVE, encInt(0)); return Camera.ack(await this.action(A.RELEASE)); }
+  /* copy a shot: returns {head: first 8 MB (holds the preview), blob: whole 3FR if keepAll} */
+  async download(token, size, progress, keepAll) {
+    await this.call(OP.INDEXED, A.RELEASE_IMG).catch(() => {});
+    await this.call(OP.BULK, 4, u8([0,0], le32(token), new Uint8Array(8)));
+    const parts = [], HEAD = 8 << 20; let got = 0, synced = false, dropped = 0;
+    while (got < size) {
+      let c = await this.readData(Math.min(2 << 20, size - got), 10000);
+      if (!c || !c.length) throw new Error(`Copy stopped at ${Math.round(got / 1e6)} of ${Math.round(size / 1e6)} MB`);
+      if (!synced) {                                       // skip any live-view leftovers before the TIFF header
+        const i = findBytes(c, TIFF_MAGIC);
+        if (i < 0) { if (++dropped > 64) throw new Error('No image data from camera'); continue; }
+        c = c.subarray(i); synced = true;
+      }
+      if (keepAll || got < HEAD) parts.push(c.slice());
+      got += c.length; progress && progress(got, size);
+    }
+    const all = new Blob(parts, {type: 'image/x-hasselblad-3fr'});
+    const head = new Uint8Array(await all.slice(0, HEAD).arrayBuffer());
+    await this.action(A.RELEASE_IMG, le32(token));
+    return {head, blob: keepAll ? all : null};
+  }
+
+  /* --- live view: the camera streams "LIVE" frames (1 KB header + 16-bit Bayer image) on 0x81 --- */
+  async liveStart(onFrame) {
+    await this.call(OP.INDEXED, A.LIVE).catch(() => {});
+    let ack = await this.live(true);
+    if (ack !== 0) {                                       // Phocus opens the lens fully before live view
+      this.lvAp = await this.call(OP.READ, P.APERTURE).catch(() => null);
+      await this.write(P.APERTURE, te.encode('r20000a')); ack = await this.live(true);
+    }
+    if (ack !== 0) throw new Error('The camera refused live view (code ' + ack + ')');
+    this.lvOn = true; const parser = new LiveParser(onFrame);
+    (async () => { while (this.lvOn && this.alive) { const c = await this.readData(1 << 20, 3000); if (!this.lvOn) break; if (c) parser.push(c); } })();
+  }
+  async liveStop() {
+    this.lvOn = false; const ack = await this.live(false);
+    if (this.lvAp && this.lvAp.length) { await this.write(P.APERTURE, this.lvAp); } this.lvAp = null;
+    return ack;
+  }
+}
+const TIFF_MAGIC = new Uint8Array([0x49,0x49,0x2a,0,8,0,0,0]);
+function findBytes(c, m, from = 0) { outer: for (let i = from; i + m.length <= c.length; i++) { for (let k = 0; k < m.length; k++) if (c[i + k] !== m[k]) continue outer; return i; } return -1; }
+function parseCardList(parts) {
+  const paths = [];
+  for (const b of parts) for (let i = 0; i < b.length - 1; i++) {
+    const n = b[i]; if (n < 3 || n > 120 || b[i + 1] !== 0x2f || i + 1 + n > b.length) continue;
+    const s = b.subarray(i + 1, i + 1 + n); if (!s.every(c => c >= 32 && c < 127)) continue;
+    paths.push(td.decode(s)); i += n;
+  }
+  return paths;
+}
+class LiveParser {
+  constructor(onFrame) { this.onFrame = onFrame; this.buf = null; this.fill = 0; }
+  push(c) {
+    let i = 0;
+    while (i < c.length) {
+      if (!this.buf) {
+        const j = findBytes(c, LIVE_MAGIC, i); if (j < 0 || c.length - j < 24) return;
+        const size = new DataView(c.buffer, c.byteOffset + j, 24).getUint32(12, true);
+        if (size < 2048 || size > (64 << 20)) { i = j + 4; continue; }
+        this.buf = new Uint8Array(size); this.fill = 0; i = j;
+      }
+      const n = Math.min(this.buf.length - this.fill, c.length - i);
+      this.buf.set(c.subarray(i, i + n), this.fill); this.fill += n; i += n;
+      if (this.fill === this.buf.length) { const f = this.buf; this.buf = null; this.onFrame(f); }
+    }
+  }
+}
+const LIVE_MAGIC = new Uint8Array([0x4c,0x49,0x56,0x45]);
+/* decode one LIVE frame to RGB: RGGB Bayer at half resolution, black 256, auto brightness.
+   Colour gains measured against the camera's own preview at 5000 K (the white balance Phocus's connect sets). */
+const LVR = {gR: 2.89, gB: 1.14, white: 3000, off: null, img: null, lut: null};
+function renderLiveFrame(f, target) {
+  const dv = new DataView(f.buffer, f.byteOffset, 32);
+  const hs = dv.getUint32(8, true), W = dv.getUint32(16, true), H = dv.getUint32(20, true);
+  if (!W || !H || hs + W * H * 2 > f.length) return false;
+  const px = new Uint16Array(f.buffer, f.byteOffset + hs, W * H);
+  let aw = W; for (let x = W >> 1; x < W; x++) if (px[10 * W + x] >= 65000) { aw = (x - 16) & ~1; break; }   // after the image: 16 optical-black columns, a marker band, padding
+  let BL = 256;
+  if (aw < W) { let s = 0, k = 0; for (let y = 8; y < H; y += 16) for (let x = aw + 2; x < aw + 14; x++) { s += px[y * W + x]; k++; } BL = s / k; }
+  const w = aw >> 1, h = H >> 1;
+  if (!LVR.off || LVR.off.width !== w || LVR.off.height !== h) { LVR.off = document.createElement('canvas'); LVR.off.width = w; LVR.off.height = h; LVR.img = LVR.off.getContext('2d').createImageData(w, h); }
+  if (!LVR.lut) { LVR.lut = new Uint8ClampedArray(4096); for (let i = 0; i < 4096; i++) LVR.lut[i] = 255 * Math.pow(i / 4095, 1 / 2.2); }
+  let sr = 0, sg = 0, sb = 0; const hist = new Uint32Array(1024); let n = 0;
+  for (let y = 4; y < h - 4; y += 6) for (let x = 4; x < w - 4; x += 6) {
+    const o = 2 * y * W + 2 * x, r = px[o] - BL, g = (px[o + 1] + px[o + W]) / 2 - BL, b = px[o + W + 1] - BL;
+    if (r > 0) sr += r; if (g > 0) sg += g; if (b > 0) sb += b; hist[Math.min(1023, Math.max(0, g) >> 6)]++; n++;
+  }
+  const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+  let acc = 0, wb = 1023; for (let k = 0; k < 1024; k++) { acc += hist[k]; if (acc >= n * .998) { wb = k; break; } }
+  LVR.white = LVR.white * .7 + Math.max(64, (wb + 1) * 64) * .3;
+  const s = 4095 / LVR.white, sR = s * LVR.gR, sB = s * LVR.gB, d = LVR.img.data, lut = LVR.lut;
+  for (let y = 0, k = 0; y < h; y++) {
+    const r0 = 2 * y * W, r1 = r0 + W;
+    for (let x = 0; x < w; x++, k += 4) {
+      const o = r0 + 2 * x, o1 = r1 + 2 * x;
+      let r = (px[o] - BL) * sR, g = ((px[o + 1] + px[o1]) * .5 - BL) * s, b = (px[o1 + 1] - BL) * sB;
+      d[k] = lut[r < 0 ? 0 : r > 4095 ? 4095 : r | 0]; d[k + 1] = lut[g < 0 ? 0 : g > 4095 ? 4095 : g | 0]; d[k + 2] = lut[b < 0 ? 0 : b > 4095 ? 4095 : b | 0]; d[k + 3] = 255;
+    }
+  }
+  LVR.off.getContext('2d').putImageData(LVR.img, 0, 0);
+  const tc = target.getContext('2d'); tc.imageSmoothingQuality = 'high';
+  tc.drawImage(LVR.off, 0, 4, w - 4, h - 4, 0, 0, target.width, target.height);   // trim the sensor's blank edge rows/columns    // 2816 x 1260 covers the 4:3 sensor: stretch to the 4:3 viewfinder
+  return true;
+}
+/* the uncompressed 1440 x 1080 RGB preview at the start of every 3FR -> canvas */
+function previewFrom3FR(head) {
+  try {
+    const dv = new DataView(head.buffer, head.byteOffset, head.byteLength);
+    if (dv.getUint32(0) !== 0x49492a00) return null;
+    const ifd = dv.getUint32(4, true), n = dv.getUint16(ifd, true), t = {};
+    for (let i = 0; i < n; i++) { const e = ifd + 2 + 12 * i, tag = dv.getUint16(e, true), ty = dv.getUint16(e + 2, true); t[tag] = ty === 3 ? dv.getUint16(e + 8, true) : dv.getUint32(e + 8, true); }
+    const W = t[256], H = t[257], off = t[273], len = t[279];
+    if (!W || !H || t[259] !== 1 || (t[277] || 1) !== 3 || off + W * H * 3 > head.length) return null;
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), img = g.createImageData(W, H);
+    for (let i = 0, j = off, k = 0; i < W * H; i++, j += 3, k += 4) { img.data[k] = head[j]; img.data[k + 1] = head[j + 1]; img.data[k + 2] = head[j + 2]; img.data[k + 3] = 255; }
+    g.putImageData(img, 0, 0); return c;
+  } catch (e) { return null; }
+}
+window.X1D = {encodeFrame, Reassembler, decodeTyped, encDouble, encRational, Camera, SimTransport, frameReply, LiveParser, renderLiveFrame, previewFrom3FR, parseCardList};
+
+/* ============================== UI ============================== */
+const $ = id => document.getElementById(id);
+const S = {cam: null, mode: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 41, lv: true, focus: 430, subject: 640, step: 125, delay: 0, reps: 1, busy: false, shots: 0, real: false};
+const logEl = $('log'); let logLines = [];
+const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
+$('btnLog').onclick = () => saveFile(new Blob([logLines.join('\n')], {type: 'text/plain'}), 'x1d_log_' + stamp() + '.txt');
+$('logBox').addEventListener('toggle', () => { logEl.textContent = logLines.join('\n'); logEl.scrollTop = 1e9; });
+const say = s => { $('state').textContent = s; };
+const modal = html => { $('modalBody').innerHTML = html; $('modal').classList.add('on'); };
+$('modalOk').onclick = () => $('modal').classList.remove('on');
+
+function buildStrip(el, items, cur, onPick) {
+  el.innerHTML = items.map(v => `<button type="button" class="${v === cur ? 'on' : ''}" data-v="${v}">${v}</button>`).join('');
+  el.onclick = e => { const b = e.target.closest('button'); if (b) onPick(b.dataset.v); };
+  const on = el.querySelector('.on'); if (on) el.scrollLeft = on.offsetLeft - el.clientWidth / 2 + on.clientWidth / 2;
+}
+const shutterChoices = SHUTTERS.filter(s => s.name !== 'T').map(s => s.name).reverse();
+function renderDials() {
+  buildStrip($('sS'), shutterChoices, S.sh, v => setExp('sh', v));
+  buildStrip($('sA'), APERTURES.map(a => a[2]), S.ap, v => setExp('ap', v));
+  buildStrip($('sI'), ISOS.map(String), String(S.iso), v => setExp('iso', +v));
+  $('lS').textContent = S.sh; $('lA').textContent = 'f/' + S.ap; $('lI').textContent = S.iso;
+  $('roS').textContent = S.sh; $('roA').textContent = S.ap; $('roI').textContent = S.iso;
+  $('ovMode').textContent = MODE_LETTER[S.mode] || '?'; $('modeTxt').textContent = MODES[S.mode] || 'Unknown';
+  $('dS').classList.toggle('lock', !(S.mode === 0 || S.mode === 2 || S.mode === 10));
+  $('dA').classList.toggle('lock', !(S.mode === 0 || S.mode === 1 || S.mode === 10));
+  $('battFill').style.width = Math.max(4, S.battery * 0.8) + '%'; $('battTxt').textContent = S.battery + '%';
+  drawMeter();
+}
+async function setExp(kind, v) {
+  const prev = S[kind]; S[kind] = v; renderDials(); draw();
+  if (!S.cam) return;
+  try {
+    if (kind === 'iso') await S.cam.write(P.ISO, encDouble(v));
+    if (kind === 'ap') { const a = APERTURES.find(x => x[2] === v); await S.cam.write(P.APERTURE, encRational(a[0], a[1])); }
+    if (kind === 'sh') { const s = SHUTTERS.find(x => x.name === v); await S.cam.write(P.SHUTTER, encRational(s.v >>> 16, s.v & 0xffff)); }
+  } catch (e) { S[kind] = prev; renderDials(); draw(); say('Camera did not accept that: ' + e.message); }
+}
+const SCENE_EV = 9;                    // demo scene: a softly lit room, EV 9 at ISO 100
+const evOffset = () => { const N = +S.ap, t = shutterSeconds(S.sh); return SCENE_EV - (Math.log2(N * N / t) - Math.log2(S.iso / 100)); };
+function drawMeter() {
+  const ev = evOffset(), c = Math.max(-3, Math.min(3, ev));
+  let s = ''; for (let i = -3; i <= 3; i++) { const x = 75 + i * 22; s += `<line x1="${x}" x2="${x}" y1="${i ? 9 : 5}" y2="15" stroke="#9a9d9f" stroke-width="1.2"/>`; }
+  s += `<path d="M${75 + c * 22 - 5} 22 L${75 + c * 22} 16 L${75 + c * 22 + 5} 22Z" fill="${Math.abs(ev) > 2.9 ? '#e8584a' : '#f1efe9'}"/>`;
+  $('meter').innerHTML = s; $('meterTxt').textContent = (ev >= 0 ? '+' : '−') + Math.abs(ev).toFixed(1) + (Math.abs(ev) > 3 ? ' (off scale)' : '');
+}
+/* --- the demo viewfinder: a drawn still life whose brightness and focus follow the settings --- */
+const cv = $('cv'), ctx = cv.getContext('2d'); let scene = null;
+function paintScene(W, H) {
+  const o = document.createElement('canvas'); o.width = W; o.height = H; const g = o.getContext('2d');
+  let gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#6d6a66'); gr.addColorStop(.62, '#a39d94'); gr.addColorStop(.62, '#5b4636'); gr.addColorStop(1, '#3a2c22');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  gr = g.createRadialGradient(W*.28, H*.15, 10, W*.28, H*.2, W*.7); gr.addColorStop(0, 'rgba(255,240,220,.45)'); gr.addColorStop(1, 'rgba(255,240,220,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  const base = H * .62, vx = W * .42, vw = W * .17;
+  g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(vx + vw*.35, base + 6, vw*.85, H*.03, 0, 0, Math.PI*2); g.fill();
+  g.beginPath(); g.moveTo(vx - vw*.35, base); g.bezierCurveTo(vx - vw*.95, base - H*.12, vx - vw*.55, base - H*.3, vx - vw*.18, base - H*.38); g.lineTo(vx - vw*.22, base - H*.46); g.lineTo(vx + vw*.22, base - H*.46); g.lineTo(vx + vw*.18, base - H*.38);
+  g.bezierCurveTo(vx + vw*.55, base - H*.3, vx + vw*.95, base - H*.12, vx + vw*.35, base); g.closePath();
+  gr = g.createLinearGradient(vx - vw, 0, vx + vw, 0); gr.addColorStop(0, '#2f4a52'); gr.addColorStop(.35, '#7fa3a6'); gr.addColorStop(.55, '#4d6f75'); gr.addColorStop(1, '#1c2f35'); g.fillStyle = gr; g.fill();
+  const bx = W * .63, br = H * .085;
+  g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(bx + br*.4, base + 4, br*1.1, H*.022, 0, 0, Math.PI*2); g.fill();
+  gr = g.createRadialGradient(bx - br*.35, base - br*1.35, br*.1, bx, base - br, br*1.1); gr.addColorStop(0, '#ffd2b0'); gr.addColorStop(.5, '#e0763a'); gr.addColorStop(1, '#7a2f12'); g.fillStyle = gr; g.beginPath(); g.arc(bx, base - br, br, 0, Math.PI*2); g.fill();
+  g.fillStyle = '#d9d2c4'; g.fillRect(W*.16, base - H*.05, W*.12, H*.05); g.fillStyle = '#b8ad99'; g.fillRect(W*.16, base - H*.05, W*.12, H*.008);
+  g.strokeStyle = 'rgba(30,20,15,.6)'; g.lineWidth = 1; for (let i = 1; i < 6; i++) { g.beginPath(); g.moveTo(W*.16, base - H*.05 + i*H*.008); g.lineTo(W*.28, base - H*.05 + i*H*.008); g.stroke(); }
+  return o;
+}
+function sizeCanvas() { const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); scene = paintScene(cv.width, cv.height); draw(); }
+function draw() {
+  if (!scene) return;
+  const W = cv.width, H = cv.height;
+  if (S.real) { if (!S.lv) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); } return; }
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  if (!S.lv) { ctx.fillStyle = '#0b0b0c'; ctx.fillRect(0, 0, W, H); ctx.fillStyle = '#9a9d9f'; ctx.font = `${16 * (W / cv.clientWidth)}px Barlow, system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.fillText('Live view off', W/2, H/2); return; }
+  const k = Math.pow(2, 0.55 * Math.max(-7, Math.min(5, evOffset())));
+  const dof = Math.sqrt(+S.ap / 3.2), blur = Math.min(14, Math.abs(S.focus - S.subject) / (34 * dof)) * (W / 900);
+  ctx.filter = `blur(${blur.toFixed(2)}px) brightness(${k.toFixed(3)})`; ctx.drawImage(scene, 0, 0); ctx.filter = 'none';
+  const noise = Math.max(0, Math.log2(S.iso / 800)) * 0.035; if (noise > 0) { ctx.globalAlpha = noise; for (let i = 0; i < 900; i++) { ctx.fillStyle = Math.random() < .5 ? '#fff' : '#000'; ctx.fillRect(Math.random()*W, Math.random()*H, 2, 2); } ctx.globalAlpha = 1; }
+  // focus bar
+  $('fpos').style.left = (S.focus / 10) + '%';
+  const half = 18 * dof; $('fdof').style.left = (S.subject - half) / 10 + '%'; $('fdof').style.width = half * 2 / 10 + '%';
+  const off = Math.abs(S.focus - S.subject); $('fsharp').textContent = off < half ? 'sharp' : off < 3 * half ? 'slightly soft' : 'soft';
+}
+new ResizeObserver(sizeCanvas).observe(cv);
+
+/* --- camera events keep the app in step with the body --- */
+function onEvent(ev) {
+  if (ev.type === 'lost') { setConn('off', 'Camera disconnected'); S.cam = null; S.lv = false; say('Lost the camera: ' + ev.error); return; }
+  if (ev.type === 'image') { if (!S.expecting) bodyShot(ev); return; }
+  if (ev.type !== 'changed') return;
+  const v = ev.value;
+  if (ev.code === P.ISO) S.iso = Math.round(v);
+  else if (ev.code === P.APERTURE && v && v.num) S.ap = apertureName(v);
+  else if (ev.code === P.SHUTTER && v && v.num != null) { const n = shutterName(v); if (n !== 'auto') S.sh = n; }
+  else if (ev.code === P.BATTERY) S.battery = v;
+  else if (ev.code === P.MODE) S.mode = v;
+  else if (ev.code === P.LIVE) { S.lv = !!v; $('ovLv').textContent = S.lv ? 'Live view' : 'Live view off'; }
+  else if (ev.code === P.LEFT) $('ovShots').textContent = v + ' in buffer';
+  else return;
+  renderDials(); draw();
+}
+function setConn(kind, txt) { const c = $('conn'); c.className = 'pill ' + kind; $('connTxt').textContent = txt; }
+
+async function attach(t) {
+  if (S.cam) { const old = S.cam; S.cam = null; await old.disconnect(); }
+  const cam = new Camera(t, log); cam.onEvent = onEvent; S.real = t.kind === 'usb';
+  setConn('', S.real ? 'Connecting…' : 'Demo camera'); showProg(0);
+  await cam.connect(p => { showProg(p); if (S.real) say('Connecting… ' + Math.round(p * 100) + '%'); });
+  hideProg(); S.cam = cam;
+  const [mode, iso, ap, sh, bat, model, fw, focal] = await Promise.all([P.MODE, P.ISO, P.APERTURE, P.SHUTTER, P.BATTERY, P.MODEL, P.FIRMWARE, P.FOCAL].map(c => cam.read(c).catch(() => null)));
+  S.mode = mode ?? 0; if (iso) S.iso = Math.round(iso); if (ap && ap.num) S.ap = apertureName(ap); if (sh && sh.num != null && shutterName(sh) !== 'auto') S.sh = shutterName(sh);
+  if (bat != null) S.battery = bat; S.lv = !S.real;
+  $('ovLens').textContent = focal ? `XCD ${focal} mm` : 'lens';
+  $('ovLv').textContent = S.lv ? 'Live view' : 'Live view off';
+  setConn(S.real ? 'usb' : '', S.real ? `${model || 'X1D-50c'} · ${fw || ''}` : 'Demo camera');
+  $('demoMode').style.display = S.real ? 'none' : '';
+  vfMessage(S.real ? 'Connected over USB.<br>Tap <b>Live view</b> to see through the lens.' : '');
+  showCard(cam.cardPaths);
+  renderDials(); draw(); say(S.real ? 'Connected to your X1D' : 'Ready (demo camera)');
+}
+function vfMessage(html) { $('vfMsg').classList.toggle('on', !!html); $('vfMsg').innerHTML = html; }
+function showProg(p) { $('prog').hidden = false; $('progBar').style.width = Math.round(p * 100) + '%'; }
+function hideProg() { $('prog').hidden = true; }
+function showCard(paths) {
+  const shots = paths.filter(p => /\.3FR$/i.test(p));
+  $('cardCount').textContent = paths.length ? `· ${shots.length} RAW` : '';
+  $('cardList').textContent = paths.filter(p => /\.(3FR|JPG|TIF)$/i.test(p)).slice(-200).reverse().map(p => p.split('/').pop()).join('\n') || 'Nothing listed.';
+}
+window.addEventListener('pagehide', () => { if (S.cam && S.real) S.cam.disconnect(); });
+$('btnConnect').onclick = async () => {
+  const noUsb = () => modal(`<p><b>USB isn\u2019t available here.</b></p><p>This preview runs inside a sandbox that blocks USB. To use your camera, open <b>x1d-remote.html</b> in Chrome on your Fold or in Chrome or Edge on your PC, from an https address or your own computer.</p><p>Close Phocus first: only one app can hold the camera.</p>`);
+  if (!navigator.usb) { modal(`<p><b>USB isn’t available here.</b></p><p>This preview runs inside a sandbox that blocks USB. To use your camera, open <b>x1d-remote.html</b> in Chrome on your Fold or in Chrome or Edge on your PC, from an https address or your own computer.</p><p>Close Phocus first: only one app can hold the camera.</p>`); return; }
+  try { const t = await UsbTransport.request(); await attach(t); }
+  catch (e) { if (String(e).includes('No device selected')) return; if (e && (e.name === 'SecurityError' || /permissions policy|disallowed/i.test(String(e)))) { noUsb(); return; } hideProg(); setConn('off', 'Not connected'); modal(`<p><b>Couldn’t open the camera.</b></p><p>${String(e.message || e)}</p><p>Check that Phocus is closed, the camera is on, and no other app (like x1d.py) is using it. On Windows, Chrome can only reach the camera if its driver is WinUSB.</p>`); }
+};
+
+/* --- focus --- */
+document.querySelectorAll('#segStep button').forEach(b => b.onclick = () => { document.querySelectorAll('#segStep button').forEach(x => x.classList.toggle('on', x === b)); S.step = +b.dataset.s; });
+const moveFocus = async dir => {
+  const n = dir * S.step; S.focus = Math.max(0, Math.min(1000, S.focus + n * 0.4)); draw();
+  if (S.cam) try { await S.cam.focus(n); } catch (e) { say(e.message); }
+};
+$('fMinus').onclick = () => moveFocus(-1); $('fPlus').onclick = () => moveFocus(1);
+$('fAF').onclick = async () => {
+  say('Focusing…'); $('focTxt').textContent = 'AF';
+  if (S.cam) try { await S.cam.action(A.AF); } catch (e) { say(e.message); return; }
+  if (!S.real) { const from = S.focus, t0 = performance.now(); const step = now => { const p = Math.min(1, (now - t0) / 700); S.focus = from + (S.subject - from) * (1 - Math.pow(1 - p, 3)); draw(); if (p < 1) requestAnimationFrame(step); else { say('Focused'); $('focTxt').textContent = 'manual'; } }; requestAnimationFrame(step); }
+  else { say('Autofocus sent'); $('focTxt').textContent = 'manual'; }
+};
+/* --- demo mode dial --- */
+document.querySelectorAll('#segMode button').forEach(b => b.onclick = () => { document.querySelectorAll('#segMode button').forEach(x => x.classList.toggle('on', x === b)); if (S.cam && S.cam.t.dialTurn) S.cam.t.dialTurn(P.MODE, 'i' + b.dataset.m); });
+/* --- release --- */
+document.querySelectorAll('#segDelay button').forEach(b => b.onclick = () => { document.querySelectorAll('#segDelay button').forEach(x => x.classList.toggle('on', x === b)); S.delay = +b.dataset.d; });
+document.querySelectorAll('#segRep button').forEach(b => b.onclick = () => { document.querySelectorAll('#segRep button').forEach(x => x.classList.toggle('on', x === b)); S.reps = +b.dataset.r; });
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function waitImage(ms) { return new Promise((res, rej) => { const prev = S.cam.onEvent; const t = setTimeout(() => { S.cam.onEvent = prev; rej(new Error('The camera didn’t report a photo')); }, ms); S.cam.onEvent = ev => { prev(ev); if (ev.type === 'image') { clearTimeout(t); S.cam.onEvent = prev; res(ev); } }; }); }
+S.imp = 'both';
+const setImp = v => { S.imp = v; document.querySelectorAll('#segImp button').forEach(x => x.classList.toggle('on', x.dataset.i === v)); $('impTxt').textContent = {jpeg:'JPEG', raw:'RAW', both:'RAW + JPEG'}[v]; try { localStorage.setItem('x1d.imp', v); } catch (e) {} };
+document.querySelectorAll('#segImp button').forEach(b => b.onclick = () => setImp(b.dataset.i));
+try { const v = localStorage.getItem('x1d.imp'); if (v && /^(raw|both|jpeg)$/.test(v)) setImp(v); } catch (e) {}
+const stamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; };
+function saveFile(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
+/* copy a shot the camera has announced, make the JPEG, add it to the gallery, save */
+async function importShot(ev, label, meta) {
+  const cam = S.cam, want = S.imp, keepAll = want !== 'jpeg';
+  say('Copying' + label + '… 0%'); showProg(0);
+  const t0 = performance.now();
+  const {head, blob} = await cam.download(ev.token, ev.size, (g, n) => { showProg(g / n); say(`Copying${label}… ${Math.round(g / n * 100)}%`); }, keepAll);
+  hideProg();
+  const secs = ((performance.now() - t0) / 1000).toFixed(1), base = 'X1D_' + stamp();
+  const prev = previewFrom3FR(head);
+  let jpeg = null, thumb = '';
+  if (prev) {
+    jpeg = await new Promise(r => prev.toBlob(r, 'image/jpeg', 0.92));
+    const tc = document.createElement('canvas'); tc.width = 224; tc.height = 168; tc.getContext('2d').drawImage(prev, 0, 0, 224, 168); thumb = tc.toDataURL('image/jpeg', .7);
+  }
+  const files = [];
+  if (want !== 'raw' && jpeg) files.push([jpeg, base + '.jpg']);
+  if (keepAll && blob) files.push([blob, base + (S.real ? '.3FR' : '_demo.3FR')]);
+  if ($('chkSave').checked && S.real) files.forEach(([b, n]) => saveFile(b, n));
+  S.shots++; $('capCount').textContent = S.shots + (S.shots === 1 ? ' shot' : ' shots');
+  const caps = $('caps'); if (S.shots === 1) caps.innerHTML = '';
+  const id = 'c' + S.shots;
+  caps.insertAdjacentHTML('afterbegin', `<div class="cap" id="${id}"><div class="th">${thumb ? `<img alt="" src="${thumb}">` : '3FR'}</div><b>${meta}</b>${(ev.size / 1e6).toFixed(0)} MB · ${secs} s · ${new Date().toTimeString().slice(0,5)}<div class="acts"></div></div>`);
+  const acts = $(id).querySelector('.acts');
+  const saved = $('chkSave').checked && S.real;
+  for (const [b, n] of files) {
+    if (saved && !n.endsWith('.jpg')) { const s = document.createElement('span'); s.textContent = '3FR saved'; s.style.color = 'var(--ok)'; acts.appendChild(s); continue; }   // don't hold 110 MB per shot in memory once it's in Downloads
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = n; a.textContent = n.endsWith('.jpg') ? 'JPEG' : '3FR'; acts.appendChild(a);
+  }
+  if (navigator.canShare && files.length && navigator.canShare({files: [new File([files[0][0]], files[0][1])]})) {
+    const sb = document.createElement('button'); sb.textContent = 'Share'; acts.appendChild(sb);
+    sb.onclick = () => navigator.share({files: files.filter(f => f[1].endsWith('.jpg')).map(([b, n]) => new File([b], n, {type: b.type}))}).catch(() => {});
+  }
+  return secs;
+}
+async function withLiveViewPaused(fn) {
+  const wasLv = S.real && S.lv && S.cam && S.cam.lvOn;
+  if (wasLv) { await S.cam.liveStop().catch(() => {}); }
+  try { return await fn(); }
+  finally { if (wasLv && S.cam) { await sleep(300); await startLive().catch(e => say(e.message)); } }
+}
+async function fireOnce(i) {
+  const cam = S.cam; const label = S.reps > 1 ? ` ${i + 1} of ${S.reps}` : '';
+  say('Exposing' + label + ' at ' + S.sh + '…');
+  const meta = `${S.sh} · f/${S.ap} · ISO ${S.iso}`;
+  S.expecting = true;
+  try {
+    const wait = waitImage(20000 + shutterSeconds(S.sh) * 1000);
+    const ack = await cam.release();
+    if (ack !== 0) { wait.catch(() => {}); throw new Error('The camera refused the shot (code ' + ack + ')'); }
+    $('flash').classList.remove('go'); void $('flash').offsetWidth; $('flash').classList.add('go');
+    const ev = await wait;
+    await importShot(ev, label, meta);
+  } finally { S.expecting = false; }
+}
+/* a photo taken with the camera's own shutter button while connected */
+let bodyQueue = Promise.resolve();
+function bodyShot(ev) {
+  if (!$('chkBody').checked || !S.cam) { if (S.cam) S.cam.action(A.RELEASE_IMG, le32(ev.token)).catch(() => {}); return; }
+  bodyQueue = bodyQueue.then(() => withLiveViewPaused(() => importShot(ev, ' (shot on camera)', 'Shot on camera'))).then(() => say('Imported a shot taken on the camera')).catch(e => say(e.message));
+}
+$('rel').onclick = async () => {
+  if (S.busy) return; if (!S.cam) { say('No camera connected'); return; }
+  S.busy = true; $('rel').classList.add('busy');
+  try {
+    for (let s = S.delay; s > 0; s--) { say('Self-timer ' + s + ' s'); await sleep(1000); }
+    await withLiveViewPaused(async () => { for (let i = 0; i < S.reps; i++) { await fireOnce(i); if (i < S.reps - 1) await sleep(600); } });
+    say(S.reps > 1 ? `Done: ${S.reps} frames` : 'Done');
+  } catch (e) { say(e.message); hideProg(); }
+  S.busy = false; $('rel').classList.remove('busy');
+};
+let lvFrames = 0, lvT0 = 0, lvBusy = false;
+async function startLive() {
+  lvFrames = 0; lvT0 = performance.now();
+  await S.cam.liveStart(f => {
+    if (lvBusy) return; lvBusy = true;
+    requestAnimationFrame(() => { if (S.lv && S.real) { renderLiveFrame(f, cv); lvFrames++; if (lvFrames === 1) vfMessage(''); } lvBusy = false; });
+  });
+  S.lv = true; $('ovLv').textContent = 'Live view on';
+}
+$('ovLv').onclick = async () => {
+  if (!S.cam) return;
+  if (!S.real) { S.lv = !S.lv; $('ovLv').textContent = S.lv ? 'Live view' : 'Live view off'; draw(); return; }
+  if (S.busy) return; S.busy = true;
+  try {
+    if (!S.lv) { vfMessage('Starting live view…'); await startLive(); say('Live view on. The camera’s own shutter button is disabled while it runs.'); }
+    else { await S.cam.liveStop(); S.lv = false; $('ovLv').textContent = 'Live view off'; draw(); vfMessage('Live view off'); const fps = lvFrames / ((performance.now() - lvT0) / 1000); say(`Live view stopped (${fps.toFixed(1)} frames a second)`); }
+  } catch (e) { vfMessage(''); say(e.message); }
+  S.busy = false;
+};
+
+/* --- start in demo mode, mid-use --- */
+renderDials();
+attach(new SimTransport()).then(() => { log('demo camera ready'); });
+}
+</script>
+</body>
+</html>
