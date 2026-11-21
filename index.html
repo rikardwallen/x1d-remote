@@ -716,7 +716,10 @@ function onEvent(ev) {
   else return;
   renderDials(); draw();
 }
-function setConn(kind, txt) { const c = $('conn'); c.className = 'pill ' + kind; $('connTxt').textContent = txt; }
+function setConn(kind, txt) {
+  const c = $('conn'); c.className = 'pill ' + kind; $('connTxt').textContent = txt;
+  $('btnConnect').style.display = kind === 'usb' ? 'none' : '';   // hidden while a real camera is connected; back when it's lost or not responding
+}
 
 let attachGen = 0, connecting = null;
 async function attach(t) {
