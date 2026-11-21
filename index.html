@@ -131,7 +131,7 @@ button{font:inherit;color:inherit}
       <span class="ro num"><span>s</span><b id="roS">1/60</b></span>
       <span class="ro num"><span>f</span><b id="roA">5.6</b></span>
       <span class="ro num"><span>ISO</span><b id="roI">400</b></span>
-      <span class="meter num"><svg id="meter" viewBox="0 0 150 22" aria-label="Exposure meter"></svg><span id="meterTxt" style="font-size:13px">±0.0</span></span>
+      <span class="meter num" id="meterBox"><svg id="meter" viewBox="0 0 150 22" aria-label="Exposure meter"></svg><span id="meterTxt" style="font-size:13px">±0.0</span></span>
     </div>
   </section>
 
@@ -288,7 +288,7 @@ class SimTransport {
   }
   async open() {}
   push(pkts) { for (const p of pkts) { const w = this.waiters.shift(); w ? w(p) : this.q.push(p); } }
-  reply(seq, op, payload) { setTimeout(() => this.push(frameReply(seq, op, payload)), 18 + Math.random() * 14); }
+  reply(seq, op, payload) { setTimeout(() => this.push(frameReply(seq, op, payload)), 3 + Math.random() * 5); }
   event(op, payload, delay = 30) { setTimeout(() => this.push(frameReply(++this.evseq & 0xffff, op, payload)), delay); }
   setVal(code, s) { this.vals[code] = s; this.event(0x42, u8([code], te.encode(s))); }
   async transferOut(ep, data) {
@@ -434,9 +434,10 @@ class Camera {
   }
 
   /* --- connect exactly as Phocus 4.2 does (recorded 21 Nov 2026), then keep the camera polled --- */
-  async connect(progress = () => {}) {
+  async connect(progress = () => {}, cancelled = () => false) {
     const last = {}, items = PHOCUS_CONNECT.trim().split(/\s+/);
     for (let i = 0; i < items.length; i++) {
+      if (cancelled()) return;
       const [o, c, v] = items[i].split(':'); const op = +o, code = c === '-' ? null : parseInt(c, 16);
       let val = unhex(v);
       if (op === OP.WRITE && code === 0x07 && last[7] && last[7].length) val = last[7];   // EV: write back what the camera reported
@@ -447,6 +448,7 @@ class Camera {
       if (op === OP.BULK && code === 2) { const {got} = await this.readExact(1024, 4000); this.log('calibration block: ' + got + ' bytes'); }
       progress((i + 1) / items.length);
     }
+    if (cancelled()) return;
     this.startKeepAlive();
   }
   startKeepAlive() {
@@ -599,7 +601,7 @@ const S = {cam: null, mode: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 41, lv:
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-21b · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-21c · ' + navigator.userAgent);
 $('btnLog').onclick = () => saveFile(new Blob([logLines.join('\n')], {type: 'text/plain'}), 'x1d_log_' + stamp() + '.txt');
 $('logBox').addEventListener('toggle', () => { logEl.textContent = logLines.join('\n'); logEl.scrollTop = 1e9; });
 const say = s => { $('state').textContent = s; };
@@ -705,12 +707,19 @@ function onEvent(ev) {
 }
 function setConn(kind, txt) { const c = $('conn'); c.className = 'pill ' + kind; $('connTxt').textContent = txt; }
 
+let attachGen = 0, connecting = null;
 async function attach(t) {
-  if (S.cam) { const old = S.cam; S.cam = null; await old.disconnect(); }
-  const cam = new Camera(t, log); cam.onEvent = onEvent; S.real = t.kind === 'usb';
-  setConn('', S.real ? 'Connecting…' : 'Demo camera'); showProg(0);
-  await cam.connect(p => { showProg(p); if (S.real) say('Connecting… ' + Math.round(p * 100) + '%'); });
-  hideProg(); S.cam = cam;
+  const gen = ++attachGen, real = t.kind === 'usb';
+  log('attach ' + (real ? 'USB camera' : 'demo camera') + ' #' + gen);
+  if (connecting) { const c = connecting; connecting = null; c.cancelled = true; if (c.t.kind === 'demo') { c.alive = false; c.stopKeepAlive(); } else await c.disconnect(); }   // a connect still in progress loses
+  if (S.cam) { const old = S.cam; S.cam = null; if (S.lv && S.real) { S.lv = false; } await old.disconnect(); }
+  if (gen !== attachGen) return;
+  const cam = new Camera(t, log); cam.onEvent = ev => { if (S.cam === cam || ev.type === 'lost') onEvent(ev); }; connecting = cam;
+  S.real = real; S.lv = false; draw();
+  setConn('', real ? 'Connecting…' : 'Demo camera'); showProg(0);
+  await cam.connect(p => { if (gen === attachGen) { showProg(p); if (real) say('Connecting… ' + Math.round(p * 100) + '%'); } }, () => cam.cancelled || gen !== attachGen);
+  if (cam.cancelled || gen !== attachGen) { log('attach #' + gen + ' superseded'); cam.stopKeepAlive(); return; }
+  connecting = null; hideProg(); S.cam = cam;
   const [mode, iso, ap, sh, bat, model, fw, focal] = await Promise.all([P.MODE, P.ISO, P.APERTURE, P.SHUTTER, P.BATTERY, P.MODEL, P.FIRMWARE, P.FOCAL].map(c => cam.read(c).catch(() => null)));
   S.mode = mode ?? 0; if (iso) S.iso = Math.round(iso); if (ap && ap.num) S.ap = apertureName(ap); if (sh && sh.num != null && shutterName(sh) !== 'auto') S.sh = shutterName(sh);
   if (bat != null) S.battery = bat; S.lv = !S.real;
@@ -719,10 +728,11 @@ async function attach(t) {
   setConn(S.real ? 'usb' : '', S.real ? `${model || 'X1D-50c'} · ${fw || ''}` : 'Demo camera');
   $('demoMode').style.display = S.real ? 'none' : '';
   vfMessage(S.real ? 'Connected over USB.<br>Tap <b>Live view</b> to see through the lens.' : '');
+  $('meterBox').style.display = S.real ? 'none' : '';             // the meter is a demo-only estimate
   showCard(cam.cardPaths);
   renderDials(); draw(); say(S.real ? 'Connected to your X1D' : 'Ready (demo camera)');
 }
-function vfMessage(html) { $('vfMsg').classList.toggle('on', !!html); $('vfMsg').innerHTML = html; }
+function vfMessage(html) { $('vfMsg').classList.toggle('on', !!html); $('vfMsg').innerHTML = html ? '<div>' + html + '</div>' : ''; }
 function showProg(p) { $('prog').hidden = false; $('progBar').style.width = Math.round(p * 100) + '%'; }
 function hideProg() { $('prog').hidden = true; }
 function showCard(paths) {
@@ -866,7 +876,7 @@ setInterval(async () => {
 }, 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) lvLast = performance.now(); });
 $('ovLv').onclick = async () => {
-  if (!S.cam) return;
+  if (!S.cam) { say(connecting ? 'Still connecting…' : 'No camera connected'); return; }
   if (!S.real) { S.lv = !S.lv; $('ovLv').textContent = S.lv ? 'Live view' : 'Live view off'; draw(); return; }
   log('tap: live view ' + (S.lv ? 'off' : 'on') + (S.busy ? ' (busy: ' + S.busyWhat + ')' : ''));
   if (S.busy) { say('Busy (' + S.busyWhat + '). Try again in a moment.'); return; }
