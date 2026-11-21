@@ -267,7 +267,15 @@ function decodeTyped(b) {
 const encInt = v => te.encode('i' + v);
 const encDouble = v => { const dv = new DataView(new ArrayBuffer(8)); dv.setFloat64(0, v); return te.encode('f' + hex(new Uint8Array(dv.buffer))); };
 const encRational = (num, den) => te.encode('r' + (((num << 16) | den) >>> 0).toString(16));
-const shutterName = r => (SHUTTERS.find(s => s.v === r.packed) || {name: r.packed === 0x7fffffff ? 'auto' : r.num + '/' + r.den}).name;
+/* label a shutter value like the camera does: standard stops from the table, metered values (A/P modes) formatted */
+function fmtSeconds(t) {
+  if (!(t > 0)) return '?';
+  if (t < 0.95) return '1/' + Math.round(1 / t);
+  if (t < 10) return t.toFixed(1);
+  if (t < 60) return String(Math.round(t));
+  const s = Math.round(t), m = Math.floor(s / 60); return m + ':' + String(s % 60).padStart(2, '0');
+}
+const shutterName = r => { if (r.packed === 0x7fffffff) return 'auto'; const s = SHUTTERS.find(x => x.v === r.packed); return s ? s.name : r.den ? fmtSeconds(r.num / r.den) : 'auto'; };
 const apertureName = r => (APERTURES.find(a => a[0] === r.num && a[1] === r.den) || [0,0,(r.num/r.den).toFixed(1)])[2];
 const shutterSeconds = name => name === 'B' || name === 'T' ? 1 : name.includes(':') ? name.split(':').reduce((m,x)=>m*60+ +x,0) : name.includes('/') ? 1 / +name.split('/')[1] : +name;
 
@@ -569,6 +577,7 @@ window.X1D = {encodeFrame, Reassembler, decodeTyped, encDouble, encRational, Cam
 /* ============================== UI ============================== */
 const $ = id => document.getElementById(id);
 const S = {cam: null, mode: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 41, lv: true, focus: 430, subject: 640, step: 125, delay: 0, reps: 1, busy: false, shots: 0, real: false};
+window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
 $('btnLog').onclick = () => saveFile(new Blob([logLines.join('\n')], {type: 'text/plain'}), 'x1d_log_' + stamp() + '.txt');
@@ -584,7 +593,9 @@ function buildStrip(el, items, cur, onPick) {
 }
 const shutterChoices = SHUTTERS.filter(s => s.name !== 'T').map(s => s.name).reverse();
 function renderDials() {
-  buildStrip($('sS'), shutterChoices, S.sh, v => setExp('sh', v));
+  let shOn = S.sh;                      // a metered speed between stops: highlight the nearest stop
+  if (!shutterChoices.includes(shOn)) { const t = shutterSeconds(shOn); let best = null, bd = 1e9; for (const n of shutterChoices) { if (n === 'B') continue; const d = Math.abs(Math.log(shutterSeconds(n) / t)); if (d < bd) { bd = d; best = n; } } shOn = best; }
+  buildStrip($('sS'), shutterChoices, shOn, v => setExp('sh', v));
   buildStrip($('sA'), APERTURES.map(a => a[2]), S.ap, v => setExp('ap', v));
   buildStrip($('sI'), ISOS.map(String), String(S.iso), v => setExp('iso', +v));
   $('lS').textContent = S.sh; $('lA').textContent = 'f/' + S.ap; $('lI').textContent = S.iso;
