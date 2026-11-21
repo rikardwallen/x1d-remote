@@ -544,7 +544,12 @@ class LiveParser {
       }
       const n = Math.min(this.buf.length - this.fill, c.length - i);
       this.buf.set(c.subarray(i, i + n), this.fill); this.fill += n; i += n;
-      if (this.fill === this.buf.length) { const f = this.buf; this.buf = null; this.frames = (this.frames || 0) + 1; this.onFrame(f); }
+      if (this.fill === this.buf.length) {
+        const f = this.buf; this.buf = null; this.frames = (this.frames || 0) + 1;
+        let h = 0; for (let k = 2048; k < f.length; k += 7919) h = (h * 31 + f[k]) | 0;   // cheap fingerprint: the camera repeats a picture until its next exposure ends
+        if (h !== this.lastHash) { this.lastHash = h; const now = performance.now(); if (this.lastNew) this.newGap = this.newGap ? this.newGap * .6 + (now - this.lastNew) * .4 : now - this.lastNew; this.lastNew = now; this.pictures = (this.pictures || 0) + 1; }
+        this.onFrame(f);
+      }
     }
   }
 }
@@ -607,7 +612,7 @@ const S = {cam: null, mode: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 41, lv:
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-21d · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-21e · ' + navigator.userAgent);
 $('btnLog').onclick = () => saveFile(new Blob([logLines.join('\n')], {type: 'text/plain'}), 'x1d_log_' + stamp() + '.txt');
 $('logBox').addEventListener('toggle', () => { logEl.textContent = logLines.join('\n'); logEl.scrollTop = 1e9; });
 const say = s => { $('state').textContent = s; };
@@ -867,7 +872,7 @@ async function startLive() {
         finally { lvBusy = false; }
       });
     });
-    S.lv = true; $('ovLv').textContent = 'Live view on';
+    S.lv = true; S.lvSlowHint = false; $('ovLv').textContent = 'Live view on';
   } finally { S.lvChanging = false; S.lvChangedAt = performance.now(); }
 }
 async function stopLive() {
@@ -878,8 +883,12 @@ async function stopLive() {
 setInterval(() => {
   const c = S.cam, st = c && c.lvStats; if (!S.real || !S.lv || !st) return;
   const p = st.parser, s = (performance.now() - st.t0) / 1000;
-  const line = `live view ${s.toFixed(0)} s: ${(st.bytes / 1e6).toFixed(1)} MB in ${st.reads} reads (${Object.entries(st.sizes).slice(0, 4).map(([k, v]) => k + '×' + v).join(', ')}), ${st.timeouts} timeouts, ${st.empty} empty, frames parsed ${p.frames || 0}, drawn ${lvFrames}, bad ${lvBad}, header skips ${p.bad || 0}, size changes ${p.sizeChanges || 0}, last size ${p.lastSize || '-'}, filling ${p.buf ? p.fill + '/' + p.buf.length : '-'}`;
-  log(line); $('ovShots').textContent = (p.frames || 0) + ' frames · ' + (st.bytes / 1e6 / s).toFixed(0) + ' MB/s';
+  const gap = p.newGap ? p.newGap / 1000 : null;
+  const line = `live view ${s.toFixed(0)} s: ${(st.bytes / 1e6).toFixed(1)} MB in ${st.reads} reads, ${st.timeouts} timeouts, frames ${p.frames || 0}, new pictures ${p.pictures || 0}${gap ? ' (every ' + gap.toFixed(1) + ' s)' : ''}, drawn ${lvFrames}, bad ${lvBad}, header skips ${p.bad || 0}`;
+  log(line);
+  const shSec = shutterSeconds(S.sh), slow = (gap && gap > 1.2) || shSec > 1;
+  $('ovShots').textContent = !gap ? 'waiting for exposure…' : gap < 1 ? (1 / gap).toFixed(0) + ' fps' : 'new picture every ' + gap.toFixed(0) + ' s';
+  if (slow && !S.lvSlowHint) { S.lvSlowHint = true; say(`Live view updates once per exposure, and the shutter speed is ${S.sh}. For a faster preview use more light, a higher ISO, a wider aperture, or M mode with a faster shutter.`); }
 }, 3000);
 /* watchdog: if frames stop arriving while live view is on, restart it (at most once every 10 s) */
 setInterval(async () => {
