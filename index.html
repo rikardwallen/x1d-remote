@@ -63,7 +63,8 @@ button{font:inherit;color:inherit}
 .tile.lock .arr{opacity:.35;pointer-events:none}.tile.lock .tv span::after{content:" · set by camera"}
 .rfocus{display:flex;gap:8px;background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:8px}
 .rfocus .key{height:52px}.rfocus #rfAF{flex:1.3}
-.rail .shotc{flex:1;display:flex;flex-direction:column;background:none;border:0;padding:0}
+.rail .shotc{flex:1;display:flex;flex-direction:column;gap:10px;background:none;border:0;padding:0}
+.rail .shotc .rfocus{order:-1}.rail .shotc .state{margin-top:0!important}
 .rail .shoot{flex:1;display:flex;flex-direction:column-reverse;justify-content:flex-start;align-items:stretch;gap:14px}
 .rail .opts .row>span{min-width:58px}
 .rail .shoot .rel{align-self:center;width:128px;height:128px;margin-top:auto}
@@ -119,7 +120,7 @@ button{font:inherit;color:inherit}
 .modal.on{display:grid}
 .modal .card{max-width:460px;font-size:15px}
 .modal p{margin:0 0 10px}
-@media(max-width:860px){.app{grid-template-columns:minmax(0,1fr);grid-template-areas:"vf" "rail" "ctl" "ses";grid-template-rows:auto}.vf{aspect-ratio:4/3}.ctl{display:flex;flex-direction:column;align-items:stretch}.rail{max-width:none}.tiles,.rfocus{display:none}.rail .shotc{display:block;background:var(--panel);border:1px solid var(--edge);padding:14px}.rail .shoot{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}.rail .shoot .rel{width:96px;height:96px;margin-top:0}.rail .opts .seg{flex:none}.ctl .fkeys{display:flex}}
+@media(max-width:860px){.app{grid-template-columns:minmax(0,1fr);grid-template-areas:"vf" "rail" "ctl" "ses";grid-template-rows:auto}.vf{aspect-ratio:4/3}.ctl{display:flex;flex-direction:column;align-items:stretch}.rail{max-width:none}.tiles{display:none}.rail .shotc .rfocus{order:0;margin-top:12px;background:none;border:0;padding:0}.rail .shotc{display:block;background:var(--panel);border:1px solid var(--edge);padding:14px}.rail .shoot{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}.rail .shoot .rel{width:96px;height:96px;margin-top:0}.rail .opts .seg{flex:none}}
 @media(max-width:600px){.brand small{display:none}#btnConnect{flex:1}.rel{width:84px;height:84px}.ov{font-size:13px;gap:10px}.meter svg{width:110px}}
 @media(prefers-reduced-motion:reduce){.flash.go{animation:none}}
 </style>
@@ -158,7 +159,6 @@ button{font:inherit;color:inherit}
       <div class="tile" id="tA"><button type="button" class="arr" data-k="ap" data-d="-1" aria-label="Wider aperture"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4 6 9l5 5"/></svg></button><div class="tv"><span>Aperture</span><b class="num" id="tvA"></b></div><button type="button" class="arr" data-k="ap" data-d="1" aria-label="Narrower aperture"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 4 5 5-5 5"/></svg></button></div>
       <div class="tile" id="tI"><button type="button" class="arr" data-k="iso" data-d="-1" aria-label="Lower ISO"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4 6 9l5 5"/></svg></button><div class="tv"><span>ISO</span><b class="num" id="tvI"></b></div><button type="button" class="arr" data-k="iso" data-d="1" aria-label="Higher ISO"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 4 5 5-5 5"/></svg></button></div>
     </div>
-    <div class="rfocus"><button class="key" id="rfMinus" aria-label="Focus closer">−</button><button class="key" id="rfAF">AF</button><button class="key" id="rfPlus" aria-label="Focus further">+</button></div>
     <div class="card shotc">
       <div class="shoot">
         <button class="rel" id="rel" aria-label="Release shutter"></button>
@@ -167,6 +167,7 @@ button{font:inherit;color:inherit}
           <div class="row" style="justify-content:space-between"><span>Frames</span><div class="seg" id="segRep"><button data-r="1" class="on">1</button><button data-r="3">3</button><button data-r="10">10</button></div></div>
         </div>
       </div>
+      <div class="rfocus"><button class="key" id="rfMinus" aria-label="Focus closer">−</button><button class="key" id="rfAF">AF</button><button class="key" id="rfPlus" aria-label="Focus further">+</button></div>
       <div class="state" id="state" style="margin-top:10px">Ready</div>
       <div class="prog" id="prog" hidden><i id="progBar"></i></div>
   </div>
@@ -637,7 +638,7 @@ const S = {cam: null, mode: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 41, lv:
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-21f · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-21g · ' + navigator.userAgent);
 $('btnLog').onclick = () => saveFile(new Blob([logLines.join('\n')], {type: 'text/plain'}), 'x1d_log_' + stamp() + '.txt');
 $('logBox').addEventListener('toggle', () => { logEl.textContent = logLines.join('\n'); logEl.scrollTop = 1e9; });
 const say = s => { $('state').textContent = s; };
