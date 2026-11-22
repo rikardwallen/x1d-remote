@@ -41,6 +41,7 @@ button{font:inherit;color:inherit}
 .ov{position:absolute;left:0;right:0;display:flex;align-items:center;gap:14px;padding:10px 14px;font-size:15px;pointer-events:none}
 .ov.top{top:0;background:linear-gradient(rgba(0,0,0,.55),transparent)}
 .ov.bot{bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.65));padding-top:28px;flex-wrap:wrap}
+.zoomb.peakb{order:8;margin-left:auto}.peakb+.zoomb{margin-left:0}
 .zoomb{order:9;margin-left:auto;display:flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;font-weight:600}.zoomb.on{background:#ff7a2f;border-color:#ff7a2f;color:#17191b}
 .lvb{pointer-events:auto;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid rgba(241,239,233,.5);background:rgba(0,0,0,.35);font-size:14px;cursor:pointer}
 .mode{font:700 22px/1 var(--fd);border:1.5px solid var(--ink);border-radius:5px;padding:1px 7px}
@@ -154,6 +155,7 @@ button{font:inherit;color:inherit}
       <span class="ro num"><span>f</span><b id="roA">5.6</b></span>
       <span class="ro num"><span>ISO</span><b id="roI">400</b></span>
       <span class="ro num" id="roEbox" hidden><span>EV</span><b id="roE">0</b></span>
+      <button type="button" id="btnPeak" class="lvb zoomb peakb" aria-label="Focus peaking" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 14 6 6l3 5 3-8 4 11"/></svg><span>Peaking</span></button>
       <button type="button" id="btnZoom" class="lvb zoomb" aria-label="Magnify to check focus"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="7.5" cy="7.5" r="5"/><path d="m11.5 11.5 4.5 4.5"/></svg><span id="zoomTxt">1×</span></button>
       <span class="meter num" id="meterBox"><svg id="meter" viewBox="0 0 150 22" aria-label="Exposure meter"></svg><span id="meterTxt" style="font-size:13px">±0.0</span></span>
     </div>
@@ -227,7 +229,8 @@ button{font:inherit;color:inherit}
 </main>
 
 <div class="log">
-  <details id="logBox"><summary>Protocol log</summary><button class="btn" id="btnLog" style="margin-top:8px">Save log as a file</button><pre id="log"></pre></details>
+  <details id="logBox"><summary>Protocol log</summary><button class="btn" id="btnLog" style="margin-top:8px">Save log as a file</button>
+    <button class="btn" id="btnZoomTest" style="margin-top:8px">Experimental: try the camera's own zoom</button><pre id="log"></pre></details>
   <div class="foot">Demo mode simulates the camera using the settings tables, replies and events recorded from a real X1D-50c (firmware 1.25.0). Live view in demo mode is a drawn scene. With the real camera, live view is the camera's own 2816 × 1260 sensor stream, decoded here (about 5 frames a second).</div>
 </div>
 
@@ -598,6 +601,23 @@ function zoomRegion(fw, fh) {          // the crop, in frame units, for the curr
   ZOOM.cx = Math.max(0.5 / ZOOM.z, Math.min(1 - 0.5 / ZOOM.z, ZOOM.cx)); ZOOM.cy = Math.max(0.5 / ZOOM.z, Math.min(1 - 0.5 / ZOOM.z, ZOOM.cy));
   return {x: ZOOM.cx * fw - rw / 2, y: ZOOM.cy * fh - rh / 2, w: rw, h: rh};
 }
+/* focus peaking: mark the strongest edges (Sobel on the green channel) in red. A fixed floor keeps soft edges and
+   high-ISO noise unmarked; in very busy scenes only the top 8% of edges are marked. */
+const PEAK = {on: false};
+function applyPeaking(img) {
+  const w = img.width, h = img.height, d = img.data, n = w * h;
+  const L = new Uint8Array(n); for (let i = 0, k = 1; i < n; i++, k += 4) L[i] = d[k];
+  const M = new Uint16Array(n), hist = new Uint32Array(1024);
+  for (let y = 1; y < h - 1; y++) for (let x = 1, i = y * w + 1; x < w - 1; x++, i++) {
+    const a = L[i - w - 1], b = L[i - w], c = L[i - w + 1], e = L[i - 1], f = L[i + 1], g = L[i + w - 1], hh = L[i + w], j = L[i + w + 1];
+    const gx = (c + 2 * f + j) - (a + 2 * e + g), gy = (g + 2 * hh + j) - (a + 2 * b + c);
+    const m = Math.min(1023, (Math.abs(gx) + Math.abs(gy)) >> 1); M[i] = m; hist[m]++;
+  }
+  let acc = 0, thr = 1023; for (let k = 1023; k > 0; k--) { acc += hist[k]; if (acc >= n * 0.08) { thr = k; break; } }
+  thr = Math.max(thr, 90);                       // absolute floor: soft edges and high-ISO noise never reach it, so nothing lights up until it is sharp
+  const mg = 4;                                  // skip the picture's outer edge
+  for (let y = mg; y < h - mg; y++) for (let x = mg, i = y * w + mg, k = i * 4; x < w - mg; x++, i++, k += 4) if (M[i] >= thr) { d[k] = 255; d[k + 1] = 40; d[k + 2] = 40; }
+}
 function drawZoomMap(tc, W, H) {       // small inset: where the magnified area sits in the frame
   if (ZOOM.z === 1) return;
   const d = W / (tc.canvas.clientWidth || W), mw = 96 * d, mh = 72 * d, mx = W - mw - 14 * d, my = 58 * d;
@@ -649,7 +669,8 @@ function renderLiveFrame(f, target) {
       d[k] = lut[r < 0 ? 0 : r > 4095 ? 4095 : r | 0]; d[k + 1] = lut[g < 0 ? 0 : g > 4095 ? 4095 : g | 0]; d[k + 2] = lut[b < 0 ? 0 : b > 4095 ? 4095 : b | 0]; d[k + 3] = 255;
     }
   }
-  LVR.off.getContext('2d').putImageData(LVR.img, 0, 0);
+  if (PEAK.on) { const keep = LVR.peakBuf && LVR.peakBuf.length === d.length ? LVR.peakBuf : (LVR.peakBuf = new Uint8ClampedArray(d.length)); keep.set(d); applyPeaking(LVR.img); LVR.off.getContext('2d').putImageData(LVR.img, 0, 0); d.set(keep); }
+  else LVR.off.getContext('2d').putImageData(LVR.img, 0, 0);
   const tc = target.getContext('2d'); tc.imageSmoothingQuality = 'high';
   if (Z) { tc.drawImage(LVR.off, 0, 0, w, h, 0, 0, target.width, target.height); drawZoomMap(tc, target.width, target.height); return true; }
   tc.drawImage(LVR.off, 0, 4, w - 4, h - 4, 0, 0, target.width, target.height);   // trim the sensor's blank edge rows/columns    // 2816 x 1260 covers the 4:3 sensor: stretch to the 4:3 viewfinder
@@ -677,7 +698,32 @@ const S = {cam: null, mode: 0, ev: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-22e · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-22g · ' + navigator.userAgent);
+/* Experiment: the X1D II zooms its live view on the camera when the live-view command's first byte is "start + 1"
+   followed by a packed centre point (y*10000 << 16 | x*10000). The X1D-50c starts with 0x01, so try 0x02 and 0x03 at the
+   centre, 3 s each, logging the camera's answer and the frame size, then return to normal live view. */
+$('btnZoomTest').onclick = async () => {
+  if (!S.cam || !S.real) { say('Connect the camera first.'); return; }
+  if (!S.lv) { say('Start live view first, then run the test.'); return; }
+  if (S.busy) { say('Busy (' + S.busyWhat + '). Try again in a moment.'); return; }
+  S.busy = true; S.busyWhat = 'camera zoom test'; const res = [];
+  const hdr = () => S.lastHdr ? `${S.lastHdr.W}×${S.lastHdr.H}, ${S.lastHdr.size} bytes` : 'no frame';
+  const pt = (5000 << 16) | 5000;
+  try {
+    log('zoom test: normal frames ' + hdr());
+    for (const first of [0x02, 0x03]) {
+      const v = u8([first, 0], le32(pt), new Uint8Array(4));
+      const ack = Camera.ack(await S.cam.action(A.LIVE, v)); const before = S.hdrCount || 0;
+      await sleep(3000);
+      const line = `start byte 0x0${first.toString(16)}: camera answered ${ack}, ${(S.hdrCount || 0) - before} frames after, last ${hdr()}`;
+      log('zoom test: ' + line); res.push(line);
+      const back = Camera.ack(await S.cam.action(A.LIVE, u8([1], new Uint8Array(9)))); log('zoom test: back to normal, answered ' + back);
+      await sleep(2000);
+    }
+    say('Zoom test done. Save the log and send it over.'); log('zoom test: normal frames again ' + hdr());
+  } catch (e) { log('zoom test error: ' + e.message); say('Zoom test stopped: ' + e.message); }
+  S.busy = false;
+};
 $('btnLog').onclick = () => saveFile(new Blob([logLines.join('\n')], {type: 'text/plain'}), 'x1d_log_' + stamp() + '.txt');
 $('logBox').addEventListener('toggle', () => { logEl.textContent = logLines.join('\n'); logEl.scrollTop = 1e9; });
 const say = s => { $('state').textContent = s; };
@@ -780,6 +826,7 @@ function draw() {
   if (ZOOM.z > 1) { const r = zoomRegion(W, H); ctx.drawImage(scene, r.x, r.y, r.w, r.h, 0, 0, W, H); } else ctx.drawImage(scene, 0, 0);
   ctx.filter = 'none';
   const noise = Math.max(0, Math.log2(S.iso / 800)) * 0.035; if (noise > 0) { ctx.globalAlpha = noise; for (let i = 0; i < 900; i++) { ctx.fillStyle = Math.random() < .5 ? '#fff' : '#000'; ctx.fillRect(Math.random()*W, Math.random()*H, 2, 2); } ctx.globalAlpha = 1; }
+  if (PEAK.on) { const im = ctx.getImageData(0, 0, W, H); applyPeaking(im); ctx.putImageData(im, 0, 0); }
   drawZoomMap(ctx, W, H);
   // focus bar
   $('fpos').style.left = (S.focus / 10) + '%';
@@ -971,6 +1018,7 @@ async function startLive() {
   try {
     await S.cam.liveStart(f => {
       lvLast = performance.now();
+      { const dv = new DataView(f.buffer, f.byteOffset, 24); S.lastHdr = {W: dv.getUint32(16, true), H: dv.getUint32(20, true), size: f.length}; S.hdrCount = (S.hdrCount || 0) + 1; }
       if (lvBusy) return; lvBusy = true;
       requestAnimationFrame(() => {
         try { if (S.lv && S.real) { const ok = renderLiveFrame(f, cv); if (!ok) lvBad++; lvFrames++; if (lvFrames === 1) vfMessage(''); } }
@@ -1028,6 +1076,9 @@ function setZoom(z) {
   if (S.real) { if (S.lv && LVR.last) renderLiveFrame(LVR.last, cv); } else draw();
   if (z > 1) say(`Magnified ${z}×. Tap the picture to move the magnified area.`);
 }
+$('btnPeak').onclick = e => { e.stopPropagation(); PEAK.on = !PEAK.on; $('btnPeak').classList.toggle('on', PEAK.on); $('btnPeak').setAttribute('aria-pressed', PEAK.on);
+  if (S.real) { if (S.lv && LVR.last) renderLiveFrame(LVR.last, cv); } else draw();
+  if (PEAK.on) say('Focus peaking on: the sharpest edges show in red.'); };
 $('btnZoom').onclick = e => { e.stopPropagation(); setZoom(ZOOM.z === 1 ? 2 : ZOOM.z === 2 ? 4 : 1); };
 cv.addEventListener('click', e => {
   if (ZOOM.z === 1) return;
