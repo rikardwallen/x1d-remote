@@ -539,6 +539,7 @@ class Camera {
     const last = {}, items = PHOCUS_CONNECT.trim().split(/\s+/);
     for (let i = 0; i < items.length; i++) {
       if (cancelled()) return;
+      if (!this.alive) throw new Error('The camera disconnected while connecting');
       const [o, c, v] = items[i].split(':'); const op = +o, code = c === '-' ? null : parseInt(c, 16);
       let val = unhex(v);
       if (op === OP.WRITE && code === 0x07 && last[7] && last[7].length) val = last[7];   // EV: write back what the camera reported
@@ -913,7 +914,7 @@ const S = {cam: null, mode: 0, ev: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-22l · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-22m · ' + navigator.userAgent);
 /* Experiment: the X1D II zooms its live view on the camera when the live-view command's first byte is "start + 1"
    followed by a packed centre point (y*10000 << 16 | x*10000). The X1D-50c starts with 0x01, so try 0x02 and 0x03 at the
    centre, 3 s each, logging the camera's answer and the frame size, then return to normal live view. */
@@ -1115,7 +1116,7 @@ function onEvent(ev) {
 }
 function setConn(kind, txt) {
   const c = $('conn'); c.className = 'pill ' + kind; $('connTxt').textContent = txt;
-  $('btnConnect').style.display = kind === 'usb' ? 'none' : '';   // hidden while a real camera is connected; back when it's lost or not responding
+  $('btnConnect').style.display = kind === 'usb' || txt === 'Connecting…' ? 'none' : '';   // hidden while a real camera is connected; back when it's lost or not responding
 }
 
 let attachGen = 0, connecting = null;
@@ -1128,7 +1129,8 @@ async function attach(t) {
   const cam = new Camera(t, log); cam.phocusWB = $('chkWB').checked; cam.onEvent = ev => { if (S.cam === cam || ev.type === 'lost') onEvent(ev); }; connecting = cam;
   S.real = real; S.lv = false; draw();
   setConn('', real ? 'Connecting…' : 'Demo camera'); showProg(0);
-  await cam.connect(p => { if (gen === attachGen) { showProg(p); if (real) say('Connecting… ' + Math.round(p * 100) + '%'); } }, () => cam.cancelled || gen !== attachGen);
+  try { await cam.connect(p => { if (gen === attachGen) { showProg(p); if (real) say('Connecting… ' + Math.round(p * 100) + '%'); } }, () => cam.cancelled || gen !== attachGen); }
+  catch (e) { if (connecting === cam) connecting = null; log('connect failed: ' + e.message); throw e; }
   if (cam.cancelled || gen !== attachGen) { log('attach #' + gen + ' superseded'); cam.stopKeepAlive(); return; }
   connecting = null; hideProg(); S.cam = cam;
   const [mode, iso, ap, sh, bat, model, fw, focal, evc] = await Promise.all([P.MODE, P.ISO, P.APERTURE, P.SHUTTER, P.BATTERY, P.MODEL, P.FIRMWARE, P.FOCAL, P.EV].map(c => cam.read(c).catch(() => null)));
@@ -1162,6 +1164,9 @@ $('btnFull').onclick = () => { if (document.fullscreenElement) document.exitFull
 document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; $('btnFull').setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen'); $('btnFull').title = on ? 'Exit full screen' : 'Full screen'; });
 window.addEventListener('pagehide', () => { if (S.cam && S.real) S.cam.disconnect(); });
 $('btnConnect').onclick = async () => {
+  log('tap: Connect camera');
+  if (connecting && connecting.t.kind === 'usb') { say('Already connecting to the camera…'); return; }   // a second connection would shut the first one's USB link
+  if (S.real && S.cam && S.cam.alive) { say('The camera is already connected.'); return; }
   const noUsb = () => modal(`<p><b>USB isn\u2019t available here.</b></p><p>This preview runs inside a sandbox that blocks USB. To use your camera, open <b>x1d-remote.html</b> in Chrome on your Fold or in Chrome or Edge on your PC, from an https address or your own computer.</p><p>Close Phocus first: only one app can hold the camera.</p>`);
   if (!navigator.usb) { modal(`<p><b>USB isn’t available here.</b></p><p>This preview runs inside a sandbox that blocks USB. To use your camera, open <b>x1d-remote.html</b> in Chrome on your Fold or in Chrome or Edge on your PC, from an https address or your own computer.</p><p>Close Phocus first: only one app can hold the camera.</p>`); return; }
   try { const t = await UsbTransport.request(); await attach(t); }
