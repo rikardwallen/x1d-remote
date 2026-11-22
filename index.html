@@ -205,6 +205,9 @@ button{font:inherit;color:inherit}
       <div class="dial" id="dA"><div class="lab"><span>Aperture</span><b class="num" id="lA"></b></div><div class="strip" id="sA"></div></div>
       <div class="dial" id="dI"><div class="lab"><span>ISO</span><b class="num" id="lI"></b></div><div class="strip" id="sI"></div></div>
       <div class="dial" id="dE"><div class="lab"><span>Exposure compensation</span><b class="num" id="lE"></b></div><div class="strip" id="sE"></div></div>
+      <div class="dial" id="dW"><div class="lab"><span>White balance</span><b class="num" id="lW">Auto</b></div><div class="strip" id="sW"></div>
+        <div class="row" id="wbFine" style="margin-top:8px;gap:8px" hidden><button class="btn" id="wbMinus" style="flex:1">− 100 K</button><button class="btn" id="wbPlus" style="flex:1">+ 100 K</button></div>
+        <div class="foot">Only changes the white balance recorded with the shot; the RAW can still be adjusted later. Live view colours don't follow it.</div></div>
       <div class="row" id="demoMode" style="margin-top:10px"><span style="font-size:14px;color:var(--dim)">Body mode dial (demo)</span>
         <div class="seg" id="segMode"><button data-m="0" class="on">M</button><button data-m="1">A</button><button data-m="2">S</button><button data-m="3">P</button></div></div>
     </div>
@@ -239,7 +242,7 @@ button{font:inherit;color:inherit}
       <label class="chk"><input type="checkbox" id="chkBody" checked> Also import shots taken on the camera</label>
       <div class="row" style="justify-content:space-between;margin-top:6px"><span style="font-size:14px">File names</span>
         <div class="seg" id="segName"><button data-n="date" class="on">Date &amp; time</button><button data-n="camera">Camera number</button></div></div>
-      <label class="chk"><input type="checkbox" id="chkWB" checked> Keep the camera's own white balance (connecting sets 5000 K, as Phocus does; this puts yours back)</label>
+      <label class="chk"><input type="checkbox" id="chkWB"> Troubleshooting: connect with Phocus's 5000 K white balance step (your setting is put back afterwards). Leave off unless connecting misbehaves.</label>
       <div class="foot" id="impNote">RAW is the full 110 MB 3FR, saved to Downloads (your gallery won't show 3FR files; open them from Files or Lightroom). JPEG is the 1440 × 1080 preview the camera stores inside every RAW, for quick sharing.</div>
     </div>
 
@@ -293,7 +296,8 @@ const APERTURES = [[0x20,0xa,'3.2'],[0x22,0xa,'3.4'],[4,1,'4'],[0x30,0xa,'4.8'],
 const SH_RAW = 'ff00001,b500001,8000001,5a80001,4000001,2d40001,2000001,16a0001,1000001,b50001,800001,5b0001,400001,2d0001,200001,170001,100001,b0001,80001,60001,40001,30001,20001,e000a,30000,10000,10001,7000a,5000a,3000a,10004,10006,10008,1000a,1000f,10014,1001e,1002d,1003c,1005a,1007d,100b4,100fa,1015e,101f4,102ee,103e8,105dc,107d0'.split(',');
 const SH_NAME = '1:08|48:16|34:08|24:08|17:04|12:04|8:32|6:02|4:16|3:01|2:08|1:31|1:04|45|32|23|16|11|8.0|6.0|4.0|3.0|2.0|1.4|T|B|1.0|0.7|0.5|0.3|1/4|1/6|1/8|1/10|1/15|1/20|1/30|1/45|1/60|1/90|1/125|1/180|1/250|1/350|1/500|1/750|1/1000|1/1500|1/2000'.split('|');
 const SHUTTERS = SH_RAW.map((h,i) => ({v:parseInt(h,16), name:SH_NAME[i]}));
-const ISOS = [100,200,400,800,1600,3200,6400,12800,25600];
+const ISOS = [100,200,400,800,1600,3200,6400,12800,25600], ISO_CHOICES = [-1, ...ISOS];   // the camera lists -1 first: Auto ISO
+const isoName = v => v < 0 ? 'Auto' : String(v);
 const PHOCUS_CONNECT = '5:-: 3:7a:49322c312c31 1:4:000000 2:11: 6:2: 6:3: 6:4: 6:6: 6:7: 2:17: 6:8: 6:9: 6:a: 6:e: 6:f: 6:10: 6:11: 6:12: 6:13: 6:17: 6:19: 6:1b: 6:1c: 6:24: 6:25: 6:27: 6:28: 6:29: 6:2b: 6:2d: 6:2e: 6:2f: 6:30: 6:33: 6:34: 6:35: 6:3d: 6:43: 6:44: 6:45: 6:46: 6:47: 6:48: 6:49: 2:17: 6:3e: 6:3f: 6:39: 2:40: 2:11: 1:e:3200 2:79: 2:10: 2:e: 4:7: 2:94: 1:e:3200 2:a: 2:8: 2:9: 2:1b: 2:25: 2:27: 4:7: 6:1a: 2:3d: 2:4e: 2:4f: 2:31: 2:29: 7:9:0000000000000000000054442a00 3:46:6937 3:47:6935303030 3:48:6930 2:2: 2:2f: 6:41: 2:41: 2:4e: 2:4f: 2:4e: 2:4f: 2:4e: 2:4f: 2:4e: 2:4f: 2:4e: 2:4f: 2:94: 2:94: 2:95: 2:35: 4:1:07000000 4:1:07000000 4:1:08000000 2:41: 2:94: 4:1:07000000 4:1:07000000 4:1:08000000 2:41: 2:94: 3:30:49322c353030302c30 3:7a:49322c312c30 1:4:010000 2:16: 2:2b: 7:2:0000010000000000000000040000 4:7:01 4:1:08000000 4:1:09000000 4:7: 4:7:02 2:89: 2:81: 2:8c: 2:41: 2:8e: 3:93:49332c302c312c32 2:82: 6:8d: 6:91: 6:8f: 6:93: 6:83: 4:1:07000000 4:1:07000000 4:1:08000000 2:41: 2:94: 2:94: 2:95: 2:35: 6:5c: 4:3: 4:2: 4:1:07000000 4:1:08000000 6:2c: 2:3: 4:1:07000000 4:1:07000000 4:1:08000000 2:7: 2:6: 3:7:6662666630303030303030303030303030 2:41:';
 const te = new TextEncoder(), td = new TextDecoder('latin1');
 const unhex = h => { const o = new Uint8Array(h.length >> 1); for (let i = 0; i < o.length; i++) o[i] = parseInt(h.substr(i * 2, 2), 16); return o; };
@@ -364,7 +368,7 @@ const shutterSeconds = name => name === 'B' || name === 'T' ? 1 : name.includes(
 class SimTransport {
   constructor() {
     this.kind = 'demo'; this.q = []; this.waiters = []; this.data = []; this.dataWaiters = [];
-    this.vals = {[P.MODE]:'i0', [P.EV]:'fbff0000000000000', [P.APERTURE]:'r38000a', [P.SHUTTER]:'r1003c', [P.ISO]:'f4079000000000000', [P.FIRMWARE]:'S10,v1.25.0-42', [P.MODEL]:'S18,Hasselblad X1D-50c', [P.SERIAL]:'S10,DEMO000001', [P.FOCAL]:'i90', [P.BATTERY]:'i41', [P.LENS]:'i1', [P.LIVE]:'i1', [P.LEFT]:'i8', [P.DRIVE]:'i0', [P.TETHER]:'I2,1,1'};
+    this.vals = {[P.MODE]:'i0', [P.EV]:'fbff0000000000000', [P.APERTURE]:'r38000a', [P.SHUTTER]:'r1003c', [P.ISO]:'f4079000000000000', [P.FIRMWARE]:'S10,v1.25.0-42', [P.MODEL]:'S18,Hasselblad X1D-50c', [P.SERIAL]:'S10,DEMO000001', [P.FOCAL]:'i90', [P.BATTERY]:'i41', [P.LENS]:'i1', [P.LIVE]:'i1', [P.LEFT]:'i8', [P.DRIVE]:'i0', [P.TETHER]:'I2,1,1', 0x46:'i2', 0x47:'i5000', 0x48:'i0', 0x30:'I2,5000,0'};
     this.token = 0x0610; this.evseq = 60;
   }
   async open() {}
@@ -430,7 +434,7 @@ class SimTransport {
     const W = 8384, H = 586, F = 1024 + W * H * 2, f = new Uint8Array(F), dv = new DataView(f.buffer);
     f.set([0x4c,0x49,0x56,0x45]); dv.setUint32(4, 2, true); dv.setUint32(8, 1024, true); dv.setUint32(12, F, true); dv.setUint32(16, W, true); dv.setUint32(20, H, true);
     const px = new Uint16Array(f.buffer, 1024, W * H);
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) px[y * W + x] = x >= 8300 && x < 8310 ? 65510 : x >= 8284 ? 276 : 276 + ((((x >> 3) + (y >> 3)) & 1) ? 3000 : 400) + (x % 700);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) px[y * W + x] = x >= 8300 && x < 8310 ? 65510 : x >= 8284 ? 276 : y < 86 ? 276 + ((x * 7 + y * 13) % 9) : 276 + ((((x >> 3) + (y >> 3)) & 1) ? 3000 : 400) + (x % 700);   // ~86 unused rows first, like the camera
     return f;
   }
   liveStream(on, band) {
@@ -538,11 +542,12 @@ class Camera {
       const [o, c, v] = items[i].split(':'); const op = +o, code = c === '-' ? null : parseInt(c, 16);
       let val = unhex(v);
       if (op === OP.WRITE && code === 0x07 && last[7] && last[7].length) val = last[7];   // EV: write back what the camera reported
-      if (op === OP.WRITE && code === 0x46 && !this.wbOrig) {                            // remember the camera's own white balance before Phocus's 5000 K
+      if (op === OP.WRITE && code === 0x46 && !this.wbOrig) {                            // the camera's own white balance, before Phocus's 5000 K step
         this.wbOrig = [];
         for (const wc of [0x46, 0x47, 0x48, 0x30]) { try { const r = await this.call(OP.READ, wc, undefined, 3000, true); if (r && r.length) this.wbOrig.push([wc, r]); } catch (e) {} }
-        this.log('white balance before connect: ' + this.wbOrig.map(([c, r]) => '0x' + c.toString(16) + ' ' + td.decode(r)).join(', '));
+        this.log('white balance before connect: ' + this.wbOrig.map(([c, r]) => '0x' + c.toString(16) + ' ' + td.decode(r)).join(', ') + (this.phocusWB ? '' : ' (left as it is)'));
       }
+      if (op === OP.WRITE && [0x46, 0x47, 0x48, 0x30].includes(code) && !this.phocusWB) { progress((i + 1) / items.length); continue; }   // skip Phocus's 5000 K: it only changes the camera's white balance
       let r; try { r = await this.call(op, code, val, 4000, op === OP.READ || op === OP.DESCRIBE || op === OP.INDEXED); } catch (e) { this.log('connect step ' + i + ': ' + e.message); continue; }
       if (op === OP.READ) last[code] = r;
       if (op === OP.LIST) this.codes = r;
@@ -552,6 +557,18 @@ class Camera {
     }
     if (cancelled()) return;
     this.startKeepAlive();
+  }
+  wbState() {                           // {mode, kelvin} from what was read at connect or set since
+    const get = c => { const e = (this.wbOrig || []).find(([k]) => k === c); return e ? decodeTyped(e[1]) : null; };
+    return this.wb || {mode: get(0x46), kelvin: get(0x47)};
+  }
+  async setWhiteBalance(kelvin) {        // null = Auto (mode 2); a number = Kelvin (mode 7), written as Phocus does
+    const acks = [];
+    if (kelvin == null) acks.push(await this.write(0x46, te.encode('i2')));
+    else for (const [c, v] of [[0x46, 'i7'], [0x47, 'i' + kelvin], [0x48, 'i0'], [0x30, `I2,${kelvin},0`]]) acks.push(await this.write(c, te.encode(v)));
+    this.log('white balance ' + (kelvin == null ? 'Auto' : kelvin + ' K') + ': acks ' + acks.join(','));
+    if (acks.every(a => a === 0)) this.wb = {mode: kelvin == null ? 2 : 7, kelvin: kelvin ?? (this.wbState().kelvin)};
+    return acks;
   }
   async restoreWhiteBalance() {
     if (!this.wbOrig || !this.wbOrig.length) return null;
@@ -770,6 +787,18 @@ function renderLiveFrame(f, target) {
   tc.drawImage(LVR.off, 0, 4, w - 4, h - 4, 0, 0, target.width, target.height);   // trim the sensor's blank edge rows/columns    // 2816 x 1260 covers the 4:3 sensor: stretch to the 4:3 viewfinder
   return true;
 }
+/* the band starts with unused rows (dark noise, ~15% on the X1D-50c): find the first row that looks like the picture */
+function bandTop(px, W, H, aw, BL) {
+  const mean = y => { let s = 0; for (let x = 16; x < aw - 16; x += 64) s += px[y * W + x] + px[y * W + x + 1]; return s / (2 * Math.ceil((aw - 32) / 64)) - BL; };
+  const rows = []; for (let y = 0; y < H; y++) rows.push(mean(y));
+  const ref = rows.slice(Math.floor(H * .4)).sort((a, b) => a - b)[Math.floor(H * .3)];   // a typical picture row
+  let top = 8;
+  if (ref > 24) for (let y = 4; y < H * .3; y++) { const t = Math.max(8, ref * .12); if (rows[y] > t && rows[y + 1] > t && rows[y + 2] > t) { top = y + 2; break; } }
+  else top = LVR.bandTop || 8;                                     // too dark to tell: keep the last answer
+  top = Math.max(top, 8) + 2 & ~1;                                 // a little margin, even row keeps the colour order
+  if (LVR.bandTop == null || Math.abs(top - LVR.bandTop) > 4) { if (LVR.bandTop == null || top > LVR.bandTop) log('punch-in: picture starts at row ' + top + ' of ' + H); LVR.bandTop = Math.max(top, LVR.bandTop || 0); }
+  return LVR.bandTop;
+}
 /* the camera's punch-in: one sensor pixel per screen pixel, cropped from the full-width band around the chosen spot */
 function renderBand(f, px, W, H, target) {
   let aw = W; for (let x = W >> 1; x < W; x++) if (px[20 * W + x] >= 65000) { aw = (x - 16) & ~1; break; }
@@ -781,7 +810,7 @@ function renderBand(f, px, W, H, target) {
     log(`punch-in: first band frame ${W}×${H}, picture ${aw} wide, black ${BL.toFixed(0)}; header ` + Array.from(f.subarray(0, 64), b => b.toString(16).padStart(2, '0')).join(''));
   }
   LVR.last = f;
-  const top = 8, rh = (H - top - 4) & ~1, rw = Math.min(aw - 8, Math.round(rh * target.width / target.height)) & ~1;
+  const top = bandTop(px, W, H, aw, BL), rh = (H - top - 4) & ~1, rw = Math.min(aw - 8, Math.round(rh * target.width / target.height)) & ~1;
   const x0 = Math.max(4, Math.min(aw - 4 - rw, Math.round(ZOOM.cx * aw - rw / 2))) & ~1, y0 = top;
   ZOOM.band = {fw: rw / aw, fh: rh / (aw * 0.75), cx: (x0 + rw / 2) / aw};
   if (!LVR.off || LVR.off.width !== rw || LVR.off.height !== rh) { LVR.off = document.createElement('canvas'); LVR.off.width = rw; LVR.off.height = rh; LVR.img = LVR.off.getContext('2d').createImageData(rw, rh); }
@@ -884,7 +913,7 @@ const S = {cam: null, mode: 0, ev: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-22k · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-22l · ' + navigator.userAgent);
 /* Experiment: the X1D II zooms its live view on the camera when the live-view command's first byte is "start + 1"
    followed by a packed centre point (y*10000 << 16 | x*10000). The X1D-50c starts with 0x01, so try 0x02 and 0x03 at the
    centre, 3 s each, logging the camera's answer and the frame size, then return to normal live view. */
@@ -923,13 +952,30 @@ function nearestShutter() {             // a metered speed between stops: the ne
 /* the rail's ‹ › buttons step one stop along the same order as the strips (B is skipped) */
 function stepExp(kind, d) {
   if (kind === 'ev') { const k = Math.round(S.ev * 3) + d; if (k >= -15 && k <= 15) setExp('ev', k / 3); return; }   // 1/3 EV per tap
-  const list = kind === 'sh' ? shutterChoices.filter(n => n !== 'B') : kind === 'ap' ? APERTURES.map(a => a[2]) : ISOS;
+  const list = kind === 'sh' ? shutterChoices.filter(n => n !== 'B') : kind === 'ap' ? APERTURES.map(a => a[2]) : ISO_CHOICES;
   const cur = kind === 'sh' ? nearestShutter() : kind === 'ap' ? S.ap : S.iso;
   const i = list.indexOf(cur), j = i < 0 ? 0 : Math.max(0, Math.min(list.length - 1, i + d));
   if (j !== i) setExp(kind, list[j]);
 }
 document.querySelectorAll('.tile .arr').forEach(b => b.onclick = () => stepExp(b.dataset.k, +b.dataset.d));
 $('reMinus').onclick = () => stepExp('ev', -1); $('rePlus').onclick = () => stepExp('ev', 1); $('reVal').onclick = () => { if (Math.abs(S.ev) > 0.01) setExp('ev', 0); };
+/* white balance: Auto, or a Kelvin value (the camera's own presets use codes the app can't name yet, so presets are set as Kelvin) */
+const WB_PRESETS = [['Auto', null], ['Tungsten', 3200], ['Fluorescent', 4000], ['Daylight', 5500], ['Cloudy', 6500], ['Shade', 7500]];
+S.wb = {mode: 2, kelvin: 5500};
+const wbName = w => !w || w.mode == null ? '–' : w.mode === 2 ? 'Auto' : w.mode === 7 ? w.kelvin + ' K' : 'Camera preset (' + w.mode + ')';
+function renderWB() {
+  const w = S.wb || {}, cur = w.mode === 2 ? 'Auto' : w.mode === 7 ? (WB_PRESETS.find(p => p[1] === w.kelvin) || [''])[0] : '';
+  buildStrip($('sW'), WB_PRESETS.map(p => p[0]), cur, v => setWB(WB_PRESETS.find(p => p[0] === v)[1]));
+  $('lW').textContent = wbName(w); $('wbFine').hidden = w.mode !== 7;
+}
+async function setWB(kelvin) {
+  const prev = S.wb; S.wb = {mode: kelvin == null ? 2 : 7, kelvin: kelvin ?? (prev && prev.kelvin) ?? 5500}; renderWB();
+  if (!S.cam || !S.real) return;
+  try { const acks = await S.cam.setWhiteBalance(kelvin); if (!acks.every(a => a === 0)) throw new Error('code ' + acks.join(',')); say('White balance: ' + wbName(S.wb)); }
+  catch (e) { S.wb = prev; renderWB(); say('The camera refused that white balance (' + e.message + ')'); }
+}
+$('wbMinus').onclick = () => { const k = (S.wb && S.wb.kelvin) || 5500; if (k > 2000) setWB(Math.max(2000, k - 100)); };
+$('wbPlus').onclick = () => { const k = (S.wb && S.wb.kelvin) || 5500; if (k < 10000) setWB(Math.min(10000, k + 100)); };
 /* exposure compensation: the camera describes it as -5 to +5 EV in 1/3 steps (a double) */
 const EV_STEPS = Array.from({length: 31}, (_, i) => (i - 15) / 3);
 const evName = v => { const t = Math.round(v * 3) / 3; return Math.abs(t) < 0.05 ? '0' : (t > 0 ? '+' : '−') + Math.abs(t).toFixed(1); };
@@ -938,15 +984,15 @@ function renderDials() {
   const shOn = nearestShutter();
   buildStrip($('sS'), shutterChoices, shOn, v => setExp('sh', v));
   buildStrip($('sA'), APERTURES.map(a => a[2]), S.ap, v => setExp('ap', v));
-  buildStrip($('sI'), ISOS.map(String), String(S.iso), v => setExp('iso', +v));
+  buildStrip($('sI'), ISO_CHOICES.map(isoName), isoName(S.iso), v => setExp('iso', v === 'Auto' ? -1 : +v));
   buildStrip($('sE'), evChoices, evName(S.ev), v => setExp('ev', EV_STEPS[evChoices.indexOf(v)]));
   const evLocked = S.mode === 0 || S.mode === 10;                 // M and video: the camera picks nothing, so compensation has no effect
   $('dE').classList.toggle('lock', evLocked); $('lE').textContent = evLocked ? 'A, S and P only' : evName(S.ev) + ' EV';
   $('roEbox').hidden = evLocked || Math.abs(S.ev) < 0.05; $('roE').textContent = evName(S.ev);
   $('rEV').hidden = evLocked; $('reVal').textContent = 'EV ' + evName(S.ev);   // rail keys only where it does something (A, S, P)
-  $('lS').textContent = S.sh; $('lA').textContent = 'f/' + S.ap; $('lI').textContent = S.iso;
-  $('roS').textContent = S.sh; $('roA').textContent = S.ap; $('roI').textContent = S.iso;
-  $('tvS').textContent = S.sh; $('tvA').textContent = 'f/' + S.ap; $('tvI').textContent = S.iso;
+  $('lS').textContent = S.sh; $('lA').textContent = 'f/' + S.ap; $('lI').textContent = isoName(S.iso);
+  $('roS').textContent = S.sh; $('roA').textContent = S.ap; $('roI').textContent = isoName(S.iso);
+  $('tvS').textContent = S.sh; $('tvA').textContent = 'f/' + S.ap; $('tvI').textContent = isoName(S.iso);
   $('ovMode').textContent = MODE_LETTER[S.mode] || '?'; $('modeTxt').textContent = MODES[S.mode] || 'Unknown';
   $('dS').classList.toggle('lock', !(S.mode === 0 || S.mode === 2 || S.mode === 10));
   $('dA').classList.toggle('lock', !(S.mode === 0 || S.mode === 1 || S.mode === 10));
@@ -965,7 +1011,7 @@ async function setExp(kind, v) {
   } catch (e) { S[kind] = prev; renderDials(); draw(); say('Camera did not accept that: ' + e.message); }
 }
 const SCENE_EV = 9;                    // demo scene: a softly lit room, EV 9 at ISO 100
-const evOffset = () => { const N = +S.ap, t = shutterSeconds(S.sh); return SCENE_EV - (Math.log2(N * N / t) - Math.log2(S.iso / 100)); };
+const evOffset = () => { const N = +S.ap, t = shutterSeconds(S.sh); return SCENE_EV - (Math.log2(N * N / t) - Math.log2(Math.max(100, S.iso) / 100)); };
 function drawMeter() {
   const ev = evOffset(), c = Math.max(-3, Math.min(3, ev));
   let s = ''; for (let i = -3; i <= 3; i++) { const x = 75 + i * 22; s += `<line x1="${x}" x2="${x}" y1="${i ? 9 : 5}" y2="15" stroke="#9a9d9f" stroke-width="1.2"/>`; }
@@ -1003,7 +1049,7 @@ function draw() {
   ctx.filter = `blur(${blur.toFixed(2)}px) brightness(${k.toFixed(3)})`;
   if (ZOOM.z > 1) { const r = zoomRegion(W, H); ctx.drawImage(scene, r.x, r.y, r.w, r.h, 0, 0, W, H); } else ctx.drawImage(scene, 0, 0);
   ctx.filter = 'none';
-  const noise = Math.max(0, Math.log2(S.iso / 800)) * 0.035; if (noise > 0) { ctx.globalAlpha = noise; for (let i = 0; i < 900; i++) { ctx.fillStyle = Math.random() < .5 ? '#fff' : '#000'; ctx.fillRect(Math.random()*W, Math.random()*H, 2, 2); } ctx.globalAlpha = 1; }
+  const noise = Math.max(0, Math.log2(Math.max(100, S.iso) / 800)) * 0.035; if (noise > 0) { ctx.globalAlpha = noise; for (let i = 0; i < 900; i++) { ctx.fillStyle = Math.random() < .5 ? '#fff' : '#000'; ctx.fillRect(Math.random()*W, Math.random()*H, 2, 2); } ctx.globalAlpha = 1; }
   if (HISTO.on) drawHistogram(ctx.getImageData(0, 0, W, H).data);
   if (PEAK.on) { const im = ctx.getImageData(0, 0, W, H); applyPeaking(im); ctx.putImageData(im, 0, 0); }
   drawZoomMap(ctx, W, H);
@@ -1079,7 +1125,7 @@ async function attach(t) {
   if (connecting) { const c = connecting; connecting = null; c.cancelled = true; if (c.t.kind === 'demo') { c.alive = false; c.stopKeepAlive(); } else await c.disconnect(); }   // a connect still in progress loses
   if (S.cam) { const old = S.cam; S.cam = null; if (S.lv && S.real) { S.lv = false; } await old.disconnect(); }
   if (gen !== attachGen) return;
-  const cam = new Camera(t, log); cam.onEvent = ev => { if (S.cam === cam || ev.type === 'lost') onEvent(ev); }; connecting = cam;
+  const cam = new Camera(t, log); cam.phocusWB = $('chkWB').checked; cam.onEvent = ev => { if (S.cam === cam || ev.type === 'lost') onEvent(ev); }; connecting = cam;
   S.real = real; S.lv = false; draw();
   setConn('', real ? 'Connecting…' : 'Demo camera'); showProg(0);
   await cam.connect(p => { if (gen === attachGen) { showProg(p); if (real) say('Connecting… ' + Math.round(p * 100) + '%'); } }, () => cam.cancelled || gen !== attachGen);
@@ -1096,7 +1142,8 @@ async function attach(t) {
   vfMessage('');
   $('meterBox').style.display = S.real ? 'none' : '';             // the meter is a demo-only estimate
   showCard(cam.cardPaths);
-  if (S.real && $('chkWB').checked) await cam.restoreWhiteBalance();
+  if (S.real && cam.phocusWB) await cam.restoreWhiteBalance();
+  if (S.real) { S.wb = cam.wbState(); renderWB(); }
   renderDials(); draw(); say(S.real ? 'Connected to your X1D' : 'Ready (demo camera)'); keepAwake(S.real); reconnectTries = 0; S.battWarned = 0; checkBattery();
   if (S.real) setTimeout(() => { if (S.cam === cam && !S.lv && !S.busy) setLive(true); }, 300);   // start live view straight away
 }
@@ -1238,7 +1285,7 @@ async function withLiveViewPaused(fn) {
 async function fireOnce(i) {
   const cam = S.cam; const label = S.reps > 1 ? ` ${i + 1} of ${S.reps}` : '';
   say('Exposing' + label + ' at ' + S.sh + '…');
-  const meta = `${S.sh} · f/${S.ap} · ISO ${S.iso}`;
+  const meta = `${S.sh} · f/${S.ap} · ISO ${isoName(S.iso)}`;
   S.expecting = true;
   try {
     const wait = waitImage(20000 + shutterSeconds(S.sh) * 1000);
@@ -1301,7 +1348,7 @@ setInterval(() => {
   const shSec = shutterSeconds(S.sh), slow = (gap && gap > 1.2) || shSec > 1;
   $('ovShots').textContent = !gap ? 'waiting for exposure (' + S.sh + ')…' : gap < 1 ? (1 / gap).toFixed(0) + ' fps' : 'new picture every ' + gap.toFixed(0) + ' s';
   if (!lvFrames && shSec > 2 && !S.lvDarkMsg) { S.lvDarkMsg = true;          // nothing to show until the first exposure ends
-    vfMessage(`It's dark: the camera has chosen a ${S.sh} exposure at ISO ${S.iso}.<br>Live view only updates once per exposure, so the first picture takes that long.<br><br>To frame: raise the ISO, add light, or switch to <b>M</b> with a faster shutter.`); }
+    vfMessage(`It's dark: the camera has chosen a ${S.sh} exposure at ISO ${isoName(S.iso)}.<br>Live view only updates once per exposure, so the first picture takes that long.<br><br>To frame: raise the ISO, add light, or switch to <b>M</b> with a faster shutter.`); }
   if (slow && !S.lvSlowHint) { S.lvSlowHint = true; say(`Live view updates once per exposure, and the shutter speed is ${S.sh}. For a faster preview use more light, a higher ISO, a wider aperture, or M mode with a faster shutter.`); }
 }, 3000);
 /* watchdog: if frames stop arriving while live view is on, restart it (at most once every 10 s) */
@@ -1341,7 +1388,7 @@ function setZoom(z, native = false) {
 let punchQ = Promise.resolve(), punchMoveT = 0;
 function punchIn(on) {
   const cam = S.cam; if (!S.real || !cam) return;
-  LVR.bandSeen = false; S.lvChangedAt = performance.now();
+  LVR.bandSeen = false; LVR.bandTop = null; S.lvChangedAt = performance.now();
   punchQ = punchQ.then(async () => {
     if (S.cam !== cam || !S.lv) return;
     const ack = on ? await cam.liveMode(2, ZOOM.cx, ZOOM.cy) : await cam.liveMode(1);
@@ -1376,7 +1423,7 @@ cv.addEventListener('click', e => {
 $('ovLv').onclick = () => { log('tap: ' + $('ovLv').textContent); setLive(!S.lv); };
 
 /* --- start in demo mode, mid-use --- */
-renderDials();
+renderDials(); renderWB();
 /* live view aids */
 const loadFlag = k => { try { return localStorage.getItem(k) === '1'; } catch (e) { return false; } }, saveFlag = (k, v) => { try { localStorage.setItem(k, v ? '1' : '0'); } catch (e) {} };
 $('chkGrid').checked = loadFlag('x1d.grid'); $('grid3').hidden = !$('chkGrid').checked;
