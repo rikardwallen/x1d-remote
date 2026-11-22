@@ -226,7 +226,7 @@ button{font:inherit;color:inherit}
         <label class="chk"><input type="checkbox" id="chkGrid"> Grid</label>
         <label class="chk"><input type="checkbox" id="chkHisto"> Histogram</label>
       </div>
-      <div class="foot">Tap the live picture to magnify that spot (2×); tap again to move it. The magnifier button steps 1× / 2× / 4×.</div>
+      <div class="foot">Tap the live picture to magnify that spot (2×); tap again to move it. The magnifier button steps 1× → 2× → 100% (the camera's own punch-in, full sensor detail) → 1×.</div>
       <button class="btn" id="btnFeatures" style="margin-top:10px">Check camera features (read only)</button>
       <div class="foot" id="featMsg">Asks the camera which settings it supports, including whether the focus point can be moved (needed for tap to focus). Changes nothing.</div>
     </div>
@@ -274,8 +274,7 @@ button{font:inherit;color:inherit}
 </main>
 
 <div class="log">
-  <details id="logBox"><summary>Protocol log</summary><button class="btn" id="btnLog" style="margin-top:8px">Save log as a file</button>
-    <button class="btn" id="btnZoomTest" style="margin-top:8px">Experimental: try the camera's own zoom</button><pre id="log"></pre></details>
+  <details id="logBox"><summary>Protocol log</summary><button class="btn" id="btnLog" style="margin-top:8px">Save log as a file</button><pre id="log"></pre></details>
   <div class="foot">Demo mode simulates the camera using the settings tables, replies and events recorded from a real X1D-50c (firmware 1.25.0). Live view in demo mode is a drawn scene. With the real camera, live view is the camera's own 2816 × 1260 sensor stream, decoded here (about 5 frames a second).</div>
 </div>
 
@@ -395,7 +394,8 @@ class SimTransport {
       } else if (code === A.RELEASE_IMG) {
         this.event(0x42, u8([0x2d], te.encode('i0')), 40);
       } else if (code === A.LIVE) {
-        if (val[0]) { this.setVal(P.LIVE, 'i1'); this.liveStream(true); }
+        if (val[0] === 2) { this.setVal(P.LIVE, 'i3'); this.liveStream(true, true); }
+        else if (val[0]) { this.setVal(P.LIVE, 'i1'); this.liveStream(true); }
         else { this.liveStream(false); setTimeout(() => this.setVal(P.LIVE, 'i0'), 600); }   // the real camera's "off" notice can arrive late
       }
     } else if (op === OP.BULK) {
@@ -426,9 +426,16 @@ class SimTransport {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) px[y * W + x] = x >= 2790 && x < 2800 ? 65510 : x >= 2774 ? 276 : 276 + ((x * 3 + y) % 2000);
     return f;
   }
-  liveStream(on) {
+  static bandFrame() {                      // punch-in frame like the camera's: header + 8384 x 586 RGGB, fine detail to judge sharpness
+    const W = 8384, H = 586, F = 1024 + W * H * 2, f = new Uint8Array(F), dv = new DataView(f.buffer);
+    f.set([0x4c,0x49,0x56,0x45]); dv.setUint32(4, 2, true); dv.setUint32(8, 1024, true); dv.setUint32(12, F, true); dv.setUint32(16, W, true); dv.setUint32(20, H, true);
+    const px = new Uint16Array(f.buffer, 1024, W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) px[y * W + x] = x >= 8300 && x < 8310 ? 65510 : x >= 8284 ? 276 : 276 + ((((x >> 3) + (y >> 3)) & 1) ? 3000 : 400) + (x % 700);
+    return f;
+  }
+  liveStream(on, band) {
     clearInterval(this.lvTimer); if (!on) return;
-    const frame = SimTransport._lf || (SimTransport._lf = SimTransport.liveFrame()); let off = 0;
+    const frame = band ? (SimTransport._bf || (SimTransport._bf = SimTransport.bandFrame())) : (SimTransport._lf || (SimTransport._lf = SimTransport.liveFrame())); let off = 0;
     this.lvTimer = setInterval(() => { for (let k = 0; k < 2; k++) { const c = frame.subarray(off, Math.min(frame.length, off + (1 << 20))); off = (off + c.length) % frame.length; const w = this.dataWaiters.shift(); w ? w(c) : this.data.push(c); } }, 50);
   }
   static fake3FRHead() {
@@ -570,6 +577,13 @@ class Camera {
   }
   focus(steps) { const b = new Uint8Array(4); new DataView(b.buffer).setInt32(0, steps, true); return this.action(A.FOCUS, b); }
   async live(on) { const b = new Uint8Array(10); b[0] = on ? 1 : 0; return Camera.ack(await this.action(A.LIVE, b)); }
+  /* live view mode 2 = the camera's own punch-in: a full-resolution band across the sensor, placed at point (u, v) in 0..1.
+     Found by testing on the X1D-50c (fw 1.25): 8384 x 586 frames instead of 2816 x 1260. Mode 3 ends live view, so it is never sent. */
+  async liveMode(mode, u = 0.5, v = 0.5) {
+    const b = new Uint8Array(10), c = x => Math.max(0, Math.min(10000, Math.round(x * 10000)));
+    b[0] = mode; if (mode === 2) new DataView(b.buffer).setUint32(2, ((c(v) << 16) | c(u)) >>> 0, true);
+    return Camera.ack(await this.action(A.LIVE, b));
+  }
 
   /* --- shutter, as Phocus: read drive mode, set single, release --- */
   async release() { await this.call(OP.READ, P.DRIVE).catch(() => {}); await this.write(P.DRIVE, encInt(0)); return Camera.ack(await this.action(A.RELEASE)); }
@@ -699,13 +713,15 @@ function drawZoomMap(tc, W, H) {       // small inset: where the magnified area 
   if (ZOOM.z === 1) return;
   const d = W / (tc.canvas.clientWidth || W), mw = 96 * d, mh = 72 * d, mx = W - mw - 14 * d, my = 58 * d;
   tc.save(); tc.fillStyle = 'rgba(0,0,0,.55)'; tc.fillRect(mx, my, mw, mh); tc.strokeStyle = 'rgba(241,239,233,.7)'; tc.lineWidth = 1.5 * d; tc.strokeRect(mx, my, mw, mh);
-  const r = zoomRegion(1, 1); tc.strokeStyle = '#ff7a2f'; tc.lineWidth = 2 * d; tc.strokeRect(mx + r.x * mw, my + r.y * mh, r.w * mw, r.h * mh); tc.restore();
+  const B = ZOOM.native && ZOOM.band, r = B ? {x: B.cx - B.fw / 2, y: Math.max(0, Math.min(1 - B.fh, ZOOM.cy - B.fh / 2)), w: B.fw, h: B.fh} : zoomRegion(1, 1); tc.strokeStyle = '#ff7a2f'; tc.lineWidth = 2 * d; tc.strokeRect(mx + r.x * mw, my + r.y * mh, r.w * mw, r.h * mh); tc.restore();
 }
 function renderLiveFrame(f, target) {
   const dv = new DataView(f.buffer, f.byteOffset, 32);
   const hs = dv.getUint32(8, true), W = dv.getUint32(16, true), H = dv.getUint32(20, true);
   if (!W || !H || hs + W * H * 2 > f.length) return false;
   const px = new Uint16Array(f.buffer, f.byteOffset + hs, W * H);
+  if (W > 4000) return renderBand(f, px, W, H, target);
+  if (ZOOM.native) { LVR.last = f; return true; }                 // normal frames still arriving while the camera switches to punch-in
   let aw = W; for (let x = W >> 1; x < W; x++) if (px[10 * W + x] >= 65000) { aw = (x - 16) & ~1; break; }   // after the image: 16 optical-black columns, a marker band, padding
   let BL = 256;
   if (aw < W) { let s = 0, k = 0; for (let y = 8; y < H; y += 16) for (let x = aw + 2; x < aw + 14; x++) { s += px[y * W + x]; k++; } BL = s / k; }
@@ -752,6 +768,47 @@ function renderLiveFrame(f, target) {
   const tc = target.getContext('2d'); tc.imageSmoothingQuality = 'high';
   if (Z) { tc.drawImage(LVR.off, 0, 0, w, h, 0, 0, target.width, target.height); drawZoomMap(tc, target.width, target.height); return true; }
   tc.drawImage(LVR.off, 0, 4, w - 4, h - 4, 0, 0, target.width, target.height);   // trim the sensor's blank edge rows/columns    // 2816 x 1260 covers the 4:3 sensor: stretch to the 4:3 viewfinder
+  return true;
+}
+/* the camera's punch-in: one sensor pixel per screen pixel, cropped from the full-width band around the chosen spot */
+function renderBand(f, px, W, H, target) {
+  let aw = W; for (let x = W >> 1; x < W; x++) if (px[20 * W + x] >= 65000) { aw = (x - 16) & ~1; break; }
+  let BL = 256;
+  if (aw < W) { let s = 0, k = 0; for (let y = 8; y < H; y += 16) for (let x = aw + 2; x < aw + 14; x++) { s += px[y * W + x]; k++; } BL = s / k; }
+  if (!ZOOM.native) { LVR.last = null; return true; }             // a late band frame after leaving punch-in: skip it
+  if (!LVR.bandSeen) {
+    LVR.bandSeen = true; ZOOM.bandAt = performance.now();
+    log(`punch-in: first band frame ${W}×${H}, picture ${aw} wide, black ${BL.toFixed(0)}; header ` + Array.from(f.subarray(0, 64), b => b.toString(16).padStart(2, '0')).join(''));
+  }
+  LVR.last = f;
+  const top = 8, rh = (H - top - 4) & ~1, rw = Math.min(aw - 8, Math.round(rh * target.width / target.height)) & ~1;
+  const x0 = Math.max(4, Math.min(aw - 4 - rw, Math.round(ZOOM.cx * aw - rw / 2))) & ~1, y0 = top;
+  ZOOM.band = {fw: rw / aw, fh: rh / (aw * 0.75), cx: (x0 + rw / 2) / aw};
+  if (!LVR.off || LVR.off.width !== rw || LVR.off.height !== rh) { LVR.off = document.createElement('canvas'); LVR.off.width = rw; LVR.off.height = rh; LVR.img = LVR.off.getContext('2d').createImageData(rw, rh); }
+  if (!LVR.lut) { LVR.lut = new Uint8ClampedArray(4096); for (let i = 0; i < 4096; i++) LVR.lut[i] = 255 * Math.pow(i / 4095, 1 / 2.2); }
+  const hist = new Uint32Array(1024); let n = 0;
+  for (let y = y0 + 2; y < y0 + rh - 2; y += 6) for (let x = x0 + 2; x < x0 + rw - 2; x += 6) { const o = (y & ~1) * W + (x & ~1), g = (px[o + 1] + px[o + W]) / 2 - BL; hist[Math.min(1023, Math.max(0, g) >> 6)]++; n++; }
+  let acc = 0, wb = 1023; for (let k = 0; k < 1024; k++) { acc += hist[k]; if (acc >= n * .998) { wb = k; break; } }
+  LVR.white = LVR.white * .7 + Math.max(64, (wb + 1) * 64) * .3;
+  const s = 4095 / LVR.white, sR = s * LVR.gR, sB = s * LVR.gB, d = LVR.img.data, lut = LVR.lut;
+  for (let yy = 0, k = 0; yy < rh; yy++) {                       // bilinear demosaic (RGGB), one output pixel per sensor pixel
+    const Y = y0 + yy, up = (Y - 1) * W, mid = Y * W, dn = (Y + 1) * W, evenRow = !(Y & 1);
+    for (let xx = 0; xx < rw; xx++, k += 4) {
+      const X = x0 + xx, L = X - 1, R = X + 1, p = px[mid + X];
+      const hv = (px[mid + L] + px[mid + R]) * .5, vv = (px[up + X] + px[dn + X]) * .5;
+      const cross = (px[mid + L] + px[mid + R] + px[up + X] + px[dn + X]) * .25, diag = (px[up + L] + px[up + R] + px[dn + L] + px[dn + R]) * .25;
+      let r, g, b;
+      if (evenRow) { if (!(X & 1)) { r = p; g = cross; b = diag; } else { g = p; r = hv; b = vv; } }
+      else { if (!(X & 1)) { g = p; r = vv; b = hv; } else { b = p; g = cross; r = diag; } }
+      r = (r - BL) * sR; g = (g - BL) * s; b = (b - BL) * sB;
+      d[k] = lut[r < 0 ? 0 : r > 4095 ? 4095 : r | 0]; d[k + 1] = lut[g < 0 ? 0 : g > 4095 ? 4095 : g | 0]; d[k + 2] = lut[b < 0 ? 0 : b > 4095 ? 4095 : b | 0]; d[k + 3] = 255;
+    }
+  }
+  drawHistogram(d);
+  if (PEAK.on) { const keep = LVR.peakBuf && LVR.peakBuf.length === d.length ? LVR.peakBuf : (LVR.peakBuf = new Uint8ClampedArray(d.length)); keep.set(d); applyPeaking(LVR.img); LVR.off.getContext('2d').putImageData(LVR.img, 0, 0); d.set(keep); }
+  else LVR.off.getContext('2d').putImageData(LVR.img, 0, 0);
+  const tc = target.getContext('2d'); tc.imageSmoothingQuality = 'high';
+  tc.drawImage(LVR.off, 0, 0, rw, rh, 0, 0, target.width, target.height); drawZoomMap(tc, target.width, target.height);
   return true;
 }
 /* --- EXIF for the JPEG: copy the camera's own tags out of the 3FR (date, camera, lens, exposure) --- */
@@ -827,32 +884,10 @@ const S = {cam: null, mode: 0, ev: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-22j · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-22k · ' + navigator.userAgent);
 /* Experiment: the X1D II zooms its live view on the camera when the live-view command's first byte is "start + 1"
    followed by a packed centre point (y*10000 << 16 | x*10000). The X1D-50c starts with 0x01, so try 0x02 and 0x03 at the
    centre, 3 s each, logging the camera's answer and the frame size, then return to normal live view. */
-$('btnZoomTest').onclick = async () => {
-  if (!S.cam || !S.real) { say('Connect the camera first.'); return; }
-  if (!S.lv) { say('Start live view first, then run the test.'); return; }
-  if (S.busy) { say('Busy (' + S.busyWhat + '). Try again in a moment.'); return; }
-  S.busy = true; S.busyWhat = 'camera zoom test'; const res = [];
-  const hdr = () => S.lastHdr ? `${S.lastHdr.W}×${S.lastHdr.H}, ${S.lastHdr.size} bytes` : 'no frame';
-  const pt = (5000 << 16) | 5000;
-  try {
-    log('zoom test: normal frames ' + hdr());
-    for (const first of [0x02, 0x03]) {
-      const v = u8([first, 0], le32(pt), new Uint8Array(4));
-      const ack = Camera.ack(await S.cam.action(A.LIVE, v)); const before = S.hdrCount || 0;
-      await sleep(3000);
-      const line = `start byte 0x0${first.toString(16)}: camera answered ${ack}, ${(S.hdrCount || 0) - before} frames after, last ${hdr()}`;
-      log('zoom test: ' + line); res.push(line);
-      const back = Camera.ack(await S.cam.action(A.LIVE, u8([1], new Uint8Array(9)))); log('zoom test: back to normal, answered ' + back);
-      await sleep(2000);
-    }
-    say('Zoom test done. Save the log and send it over.'); log('zoom test: normal frames again ' + hdr());
-  } catch (e) { log('zoom test error: ' + e.message); say('Zoom test stopped: ' + e.message); }
-  S.busy = false;
-};
 /* --- install as an app, offline shell, keep the screen awake while a camera is connected --- */
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(e => log('service worker: ' + e.message));
 let installEvt = null;
@@ -1237,6 +1272,7 @@ window.X1D_LOG = () => logLines.join('\n');
 window.X1D_LV = () => ({frames: lvFrames, sinceLast: Math.round(performance.now() - lvLast), lv: S.lv, busy: S.busy, restarts: lvRestarts});
 async function startLive() {
   lvFrames = 0; lvT0 = lvLast = performance.now(); S.lvChanging = true;
+  if (ZOOM.native) { ZOOM.native = false; ZOOM.z = 1; $('zoomTxt').textContent = '1×'; $('btnZoom').classList.remove('on'); }
   try {
     await S.cam.liveStart(f => {
       lvLast = performance.now();
@@ -1293,17 +1329,46 @@ async function setLive(on) {
   S.busy = false;
 }
 /* magnifier: the button steps 1x -> 2x -> 4x -> 1x; while magnified, tapping the picture moves the magnified area */
-function setZoom(z) {
-  ZOOM.z = z; $('zoomTxt').textContent = z + '×'; $('btnZoom').classList.toggle('on', z > 1);
-  if (S.real) { if (S.lv && LVR.last) renderLiveFrame(LVR.last, cv); } else draw();
-  if (z > 1) say(`Magnified ${z}×. Tap the picture to move the magnified area.`);
+function setZoom(z, native = false) {
+  const wasNative = !!ZOOM.native;
+  ZOOM.z = z; ZOOM.native = native; $('zoomTxt').textContent = native ? '100%' : z + '×'; $('btnZoom').classList.toggle('on', z > 1 || native);
+  if (native !== wasNative) punchIn(native);
+  if (S.real) { if (S.lv && LVR.last && !native) renderLiveFrame(LVR.last, cv); } else draw();
+  if (native) say('Camera punch-in: 100%, full sensor detail. Tap the picture to move it.');
+  else if (z > 1) say(`Magnified ${z}×. Tap the picture to move the magnified area.`);
+}
+/* switch the camera in and out of its punch-in mode; calls run one after another */
+let punchQ = Promise.resolve(), punchMoveT = 0;
+function punchIn(on) {
+  const cam = S.cam; if (!S.real || !cam) return;
+  LVR.bandSeen = false; S.lvChangedAt = performance.now();
+  punchQ = punchQ.then(async () => {
+    if (S.cam !== cam || !S.lv) return;
+    const ack = on ? await cam.liveMode(2, ZOOM.cx, ZOOM.cy) : await cam.liveMode(1);
+    log(`punch-in ${on ? 'on at ' + ZOOM.cx.toFixed(2) + ',' + ZOOM.cy.toFixed(2) : 'off'}: camera answered ${ack}`); S.lvChangedAt = performance.now();
+    if (on && ack !== 0) { say('The camera refused punch-in (code ' + ack + '). Showing 4× instead.'); setZoom(4); return; }
+    if (on) setTimeout(() => { if (ZOOM.native && !LVR.bandSeen && S.cam === cam) { log('punch-in: no band frames after 4 s'); say('No punch-in picture from the camera. Showing 4× instead.'); setZoom(4); } }, 4000);
+  }).catch(e => log('punch-in: ' + e.message));
+}
+function punchMove() {                 // the camera places the band; re-send the spot shortly after the last tap
+  clearTimeout(punchMoveT);
+  punchMoveT = setTimeout(() => { const cam = S.cam; if (!ZOOM.native || !cam || !S.lv) return; S.lvChangedAt = performance.now();
+    punchQ = punchQ.then(async () => { const ack = await cam.liveMode(2, ZOOM.cx, ZOOM.cy); log(`punch-in moved to ${ZOOM.cx.toFixed(2)},${ZOOM.cy.toFixed(2)}: camera answered ${ack}`); }).catch(e => log('punch-in: ' + e.message)); }, 350);
 }
 $('btnPeak').onclick = e => { e.stopPropagation(); PEAK.on = !PEAK.on; $('btnPeak').classList.toggle('on', PEAK.on); $('btnPeak').setAttribute('aria-pressed', PEAK.on);
   if (S.real) { if (S.lv && LVR.last) renderLiveFrame(LVR.last, cv); } else draw();
   if (PEAK.on) say('Focus peaking on: the sharpest edges show in red.'); };
-$('btnZoom').onclick = e => { e.stopPropagation(); setZoom(ZOOM.z === 1 ? 2 : ZOOM.z === 2 ? 4 : 1); };
+$('btnZoom').onclick = e => { e.stopPropagation();
+  if (ZOOM.native) setZoom(1);
+  else if (ZOOM.z === 1) setZoom(2);
+  else if (ZOOM.z === 2 && S.real && S.lv) setZoom(2, true);       // real camera: 1x -> 2x -> camera punch-in (100%) -> 1x
+  else if (ZOOM.z === 2) setZoom(4); else setZoom(1); };
 cv.addEventListener('click', e => {
   const b = cv.getBoundingClientRect(), u = (e.clientX - b.left) / b.width, v = (e.clientY - b.top) / b.height;
+  if (ZOOM.native) {                                                               // punch-in: move across the band, ask the camera for a new height
+    const B = ZOOM.band || {fw: 0.16, fh: 0.09}; ZOOM.cx = Math.max(0, Math.min(1, (B.cx ?? ZOOM.cx) + (u - 0.5) * B.fw)); ZOOM.cy = Math.max(0, Math.min(1, ZOOM.cy + (v - 0.5) * B.fh));
+    punchMove(); if (LVR.last) renderLiveFrame(LVR.last, cv); return;
+  }
   if (ZOOM.z === 1) { ZOOM.cx = u; ZOOM.cy = v; setZoom(2); return; }            // tap to magnify that spot
   ZOOM.cx += (u - 0.5) / ZOOM.z; ZOOM.cy += (v - 0.5) / ZOOM.z;
   if (S.real) { if (S.lv && LVR.last) renderLiveFrame(LVR.last, cv); } else draw();
