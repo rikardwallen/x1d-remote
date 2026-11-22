@@ -677,7 +677,7 @@ const S = {cam: null, mode: 0, ev: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-22d · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-22e · ' + navigator.userAgent);
 $('btnLog').onclick = () => saveFile(new Blob([logLines.join('\n')], {type: 'text/plain'}), 'x1d_log_' + stamp() + '.txt');
 $('logBox').addEventListener('toggle', () => { logEl.textContent = logLines.join('\n'); logEl.scrollTop = 1e9; });
 const say = s => { $('state').textContent = s; };
@@ -978,7 +978,7 @@ async function startLive() {
         finally { lvBusy = false; }
       });
     });
-    S.lv = true; S.lvSlowHint = false; lvLabel();
+    S.lv = true; S.lvSlowHint = false; S.lvDarkMsg = false; lvLabel();
   } finally { S.lvChanging = false; S.lvChangedAt = performance.now(); }
 }
 async function stopLive() {
@@ -993,7 +993,9 @@ setInterval(() => {
   const line = `live view ${s.toFixed(0)} s: ${(st.bytes / 1e6).toFixed(1)} MB in ${st.reads} reads, ${st.timeouts} timeouts, frames ${p.frames || 0}, new pictures ${p.pictures || 0}${gap ? ' (every ' + gap.toFixed(1) + ' s)' : ''}, drawn ${lvFrames}, bad ${lvBad}, header skips ${p.bad || 0}`;
   log(line);
   const shSec = shutterSeconds(S.sh), slow = (gap && gap > 1.2) || shSec > 1;
-  $('ovShots').textContent = !gap ? 'waiting for exposure…' : gap < 1 ? (1 / gap).toFixed(0) + ' fps' : 'new picture every ' + gap.toFixed(0) + ' s';
+  $('ovShots').textContent = !gap ? 'waiting for exposure (' + S.sh + ')…' : gap < 1 ? (1 / gap).toFixed(0) + ' fps' : 'new picture every ' + gap.toFixed(0) + ' s';
+  if (!lvFrames && shSec > 2 && !S.lvDarkMsg) { S.lvDarkMsg = true;          // nothing to show until the first exposure ends
+    vfMessage(`It's dark: the camera has chosen a ${S.sh} exposure at ISO ${S.iso}.<br>Live view only updates once per exposure, so the first picture takes that long.<br><br>To frame: raise the ISO, add light, or switch to <b>M</b> with a faster shutter.`); }
   if (slow && !S.lvSlowHint) { S.lvSlowHint = true; say(`Live view updates once per exposure, and the shutter speed is ${S.sh}. For a faster preview use more light, a higher ISO, a wider aperture, or M mode with a faster shutter.`); }
 }, 3000);
 /* watchdog: if frames stop arriving while live view is on, restart it (at most once every 10 s) */
