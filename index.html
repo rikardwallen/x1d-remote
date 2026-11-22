@@ -146,7 +146,7 @@ button{font:inherit;color:inherit}
       <span class="mode" id="ovMode">M</span>
       <span id="ovLens">XCD 90 mm</span>
       <span id="ovShots" style="margin-left:auto">8 in buffer</span>
-      <button type="button" id="ovLv" class="lvb">Live view</button>
+      <button type="button" id="ovLv" class="lvb">Stop live view</button>
     </div>
     <div class="ov bot">
       <span class="ro num"><span>s</span><b id="roS">1/60</b></span>
@@ -644,7 +644,7 @@ const S = {cam: null, mode: 0, ev: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-22b · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-22c · ' + navigator.userAgent);
 $('btnLog').onclick = () => saveFile(new Blob([logLines.join('\n')], {type: 'text/plain'}), 'x1d_log_' + stamp() + '.txt');
 $('logBox').addEventListener('toggle', () => { logEl.textContent = logLines.join('\n'); logEl.scrollTop = 1e9; });
 const say = s => { $('state').textContent = s; };
@@ -766,9 +766,9 @@ function onEvent(ev) {
   else if (ev.code === P.BATTERY) S.battery = v;
   else if (ev.code === P.MODE) S.mode = v;
   else if (ev.code === P.LIVE) {
-    if (!S.real) { S.lv = !!v; $('ovLv').textContent = S.lv ? 'Live view' : 'Live view off'; }
+    if (!S.real) { S.lv = !!v; lvLabel(); }
     else if (!v && S.lv && !S.lvChanging && performance.now() - S.lvChangedAt > 2500) {   // the camera ended live view by itself
-      S.lv = false; if (S.cam) S.cam.liveStop().catch(() => {}); $('ovLv').textContent = 'Live view off'; vfMessage('The camera stopped live view.<br>Tap <b>Live view</b> to start it again.'); log('camera ended live view');
+      S.lv = false; if (S.cam) S.cam.liveStop().catch(() => {}); lvLabel(); vfMessage('The camera stopped live view.<br>Tap <b>Start live view</b> to start it again.'); log('camera ended live view');
     }
     return;
   }
@@ -799,14 +799,16 @@ async function attach(t) {
   S.mode = mode ?? 0; if (iso) S.iso = Math.round(iso); if (ap && ap.num) S.ap = apertureName(ap); if (sh && sh.num != null && shutterName(sh) !== 'auto') S.sh = shutterName(sh);
   if (bat != null) S.battery = bat; S.lv = !S.real;
   $('ovLens').textContent = focal ? `XCD ${focal} mm` : 'lens';
-  $('ovLv').textContent = S.lv ? 'Live view' : 'Live view off';
+  lvLabel();
   setConn(S.real ? 'usb' : '', S.real ? `${model || 'X1D-50c'} · ${fw || ''}` : 'Demo camera');
   $('demoMode').style.display = S.real ? 'none' : '';
-  vfMessage(S.real ? 'Connected over USB.<br>Tap <b>Live view</b> to see through the lens.' : '');
+  vfMessage('');
   $('meterBox').style.display = S.real ? 'none' : '';             // the meter is a demo-only estimate
   showCard(cam.cardPaths);
   renderDials(); draw(); say(S.real ? 'Connected to your X1D' : 'Ready (demo camera)');
+  if (S.real) setTimeout(() => { if (S.cam === cam && !S.lv && !S.busy) setLive(true); }, 300);   // start live view straight away
 }
+const lvLabel = () => { $('ovLv').textContent = S.lv ? 'Stop live view' : 'Start live view'; };
 function vfMessage(html) { $('vfMsg').classList.toggle('on', !!html); $('vfMsg').innerHTML = html ? '<div>' + html + '</div>' : ''; }
 function showProg(p) { $('prog').hidden = false; $('progBar').style.width = Math.round(p * 100) + '%'; }
 function hideProg() { $('prog').hidden = true; }
@@ -940,7 +942,7 @@ async function startLive() {
         finally { lvBusy = false; }
       });
     });
-    S.lv = true; S.lvSlowHint = false; $('ovLv').textContent = 'Live view on';
+    S.lv = true; S.lvSlowHint = false; lvLabel();
   } finally { S.lvChanging = false; S.lvChangedAt = performance.now(); }
 }
 async function stopLive() {
@@ -965,22 +967,24 @@ setInterval(async () => {
   if (now - lvLast < 4000 || now - S.lvChangedAt < 10000) return;
   log('live view: no frames for ' + Math.round((now - lvLast) / 1000) + ' s, restarting'); lvRestarts++;
   S.busy = true; S.busyWhat = 'restarting live view';
-  try { await stopLive(); await sleep(400); await startLive(); say('Live view restarted'); } catch (e) { say('Live view stopped: ' + e.message); vfMessage('Live view stopped.<br>Tap <b>Live view</b> to try again.'); $('ovLv').textContent = 'Live view off'; }
+  try { await stopLive(); await sleep(400); await startLive(); say('Live view restarted'); } catch (e) { say('Live view stopped: ' + e.message); vfMessage('Live view stopped.<br>Tap <b>Start live view</b> to try again.'); lvLabel(); }
   S.busy = false;
 }, 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) lvLast = performance.now(); });
-$('ovLv').onclick = async () => {
+async function setLive(on) {
   if (!S.cam) { say(connecting ? 'Still connecting…' : 'No camera connected'); return; }
-  if (!S.real) { S.lv = !S.lv; $('ovLv').textContent = S.lv ? 'Live view' : 'Live view off'; draw(); return; }
-  log('tap: live view ' + (S.lv ? 'off' : 'on') + (S.busy ? ' (busy: ' + S.busyWhat + ')' : ''));
+  if (!S.real) { S.lv = on; lvLabel(); draw(); return; }
+  log('live view ' + (on ? 'start' : 'stop') + (S.busy ? ' (busy: ' + S.busyWhat + ')' : ''));
+  if (on === S.lv) return;
   if (S.busy) { say('Busy (' + S.busyWhat + '). Try again in a moment.'); return; }
   S.busy = true; S.busyWhat = 'live view';
   try {
-    if (!S.lv) { vfMessage('Starting live view…'); await Promise.race([startLive(), sleep(12000).then(() => { throw new Error('Live view didn’t start (no reply from the camera)'); })]); say('Live view on. The camera’s own shutter button is disabled while it runs.'); }
-    else { await stopLive(); $('ovLv').textContent = 'Live view off'; draw(); vfMessage('Live view off'); const fps = lvFrames / ((performance.now() - lvT0) / 1000); say(`Live view stopped (${fps.toFixed(1)} frames a second)`); }
-  } catch (e) { vfMessage(''); say(e.message); }
+    if (on) { vfMessage('Starting live view…'); $('ovLv').textContent = 'Starting…'; await Promise.race([startLive(), sleep(12000).then(() => { throw new Error('no reply from the camera'); })]); say('Live view on. The camera’s own shutter button is disabled while it runs.'); }
+    else { await stopLive(); lvLabel(); draw(); vfMessage('Live view is off.<br>Tap <b>Start live view</b> to turn it back on.'); const fps = lvFrames / ((performance.now() - lvT0) / 1000); say(`Live view stopped (${fps.toFixed(1)} frames a second)`); }
+  } catch (e) { S.lv = false; lvLabel(); draw(); vfMessage('Live view didn’t start: ' + e.message + '.<br>Tap <b>Start live view</b> to try again. If it keeps failing, save the log (bottom of the page) and send it over.'); say('Live view didn’t start: ' + e.message); log('live view failed: ' + e.message); }
   S.busy = false;
-};
+}
+$('ovLv').onclick = () => { log('tap: ' + $('ovLv').textContent); setLive(!S.lv); };
 
 /* --- start in demo mode, mid-use --- */
 renderDials();
