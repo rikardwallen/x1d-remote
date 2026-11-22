@@ -81,6 +81,7 @@ button{font:inherit;color:inherit}
 .strip button.on{background:var(--alu);color:#141516;border-color:var(--alu)}
 .dial.lock .strip{opacity:.38;pointer-events:none}
 .dial.lock .lab::after{content:"set by camera";font-size:13px}
+#dE.lock .lab::after{content:none}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .key{min-width:56px;height:52px;border-radius:12px;border:1px solid #e6e8ea;background:linear-gradient(#d9dcdf,#b2b6ba);color:#17191b;font:700 20px var(--fd);cursor:pointer;flex:1}
 .key:active{transform:translateY(1px);background:linear-gradient(#c3c6ca,#a7abaf)}
@@ -149,6 +150,7 @@ button{font:inherit;color:inherit}
       <span class="ro num"><span>s</span><b id="roS">1/60</b></span>
       <span class="ro num"><span>f</span><b id="roA">5.6</b></span>
       <span class="ro num"><span>ISO</span><b id="roI">400</b></span>
+      <span class="ro num" id="roEbox" hidden><span>EV</span><b id="roE">0</b></span>
       <span class="meter num" id="meterBox"><svg id="meter" viewBox="0 0 150 22" aria-label="Exposure meter"></svg><span id="meterTxt" style="font-size:13px">±0.0</span></span>
     </div>
   </section>
@@ -158,6 +160,7 @@ button{font:inherit;color:inherit}
       <div class="tile" id="tS"><button type="button" class="arr" data-k="sh" data-d="-1" aria-label="Faster shutter"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4 6 9l5 5"/></svg></button><div class="tv"><span>Shutter</span><b class="num" id="tvS"></b></div><button type="button" class="arr" data-k="sh" data-d="1" aria-label="Slower shutter"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 4 5 5-5 5"/></svg></button></div>
       <div class="tile" id="tA"><button type="button" class="arr" data-k="ap" data-d="-1" aria-label="Wider aperture"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4 6 9l5 5"/></svg></button><div class="tv"><span>Aperture</span><b class="num" id="tvA"></b></div><button type="button" class="arr" data-k="ap" data-d="1" aria-label="Narrower aperture"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 4 5 5-5 5"/></svg></button></div>
       <div class="tile" id="tI"><button type="button" class="arr" data-k="iso" data-d="-1" aria-label="Lower ISO"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4 6 9l5 5"/></svg></button><div class="tv"><span>ISO</span><b class="num" id="tvI"></b></div><button type="button" class="arr" data-k="iso" data-d="1" aria-label="Higher ISO"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 4 5 5-5 5"/></svg></button></div>
+      <div class="tile" id="tE" hidden><button type="button" class="arr" data-k="ev" data-d="-1" aria-label="Less exposure"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4 6 9l5 5"/></svg></button><div class="tv"><span>Exposure comp.</span><b class="num" id="tvE"></b></div><button type="button" class="arr" data-k="ev" data-d="1" aria-label="More exposure"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 4 5 5-5 5"/></svg></button></div>
     </div>
     <div class="card shotc">
       <div class="shoot">
@@ -179,6 +182,7 @@ button{font:inherit;color:inherit}
       <div class="dial" id="dS"><div class="lab"><span>Shutter</span><b class="num" id="lS"></b></div><div class="strip" id="sS"></div></div>
       <div class="dial" id="dA"><div class="lab"><span>Aperture</span><b class="num" id="lA"></b></div><div class="strip" id="sA"></div></div>
       <div class="dial" id="dI"><div class="lab"><span>ISO</span><b class="num" id="lI"></b></div><div class="strip" id="sI"></div></div>
+      <div class="dial" id="dE"><div class="lab"><span>Exposure compensation</span><b class="num" id="lE"></b></div><div class="strip" id="sE"></div></div>
       <div class="row" id="demoMode" style="margin-top:10px"><span style="font-size:14px;color:var(--dim)">Body mode dial (demo)</span>
         <div class="seg" id="segMode"><button data-m="0" class="on">M</button><button data-m="1">A</button><button data-m="2">S</button><button data-m="3">P</button></div></div>
     </div>
@@ -230,7 +234,7 @@ button{font:inherit;color:inherit}
 /* ============================== protocol ============================== */
 const VID = 0x2756, PID = 0x0002, PKT = 512;
 const OP = {ACTION:1, READ:2, WRITE:3, INDEXED:4, LIST:5, DESCRIBE:6, BULK:7};
-const P = {MODE:0x03, APERTURE:0x08, SHUTTER:0x09, ISO:0x0a, FIRMWARE:0x1b, MODEL:0x25, SERIAL:0x27, FOCAL:0x2e, BATTERY:0x2f, LIVE:0x35, LENS:0x3d, DRIVE:0x41, LEFT:0x49, TETHER:0x7a};
+const P = {MODE:0x03, EV:0x07, APERTURE:0x08, SHUTTER:0x09, ISO:0x0a, FIRMWARE:0x1b, MODEL:0x25, SERIAL:0x27, FOCAL:0x2e, BATTERY:0x2f, LIVE:0x35, LENS:0x3d, DRIVE:0x41, LEFT:0x49, TETHER:0x7a};
 const A = {RELEASE:1, AF:2, FOCUS:3, SESSION:4, LIVE:7, RELEASE_IMG:9};
 const MODES = {0:'Manual', 1:'Aperture priority', 2:'Shutter priority', 3:'Program', 9:'Full auto', 10:'Video'};
 const MODE_LETTER = {0:'M', 1:'A', 2:'S', 3:'P', 9:'FA', 10:'V'};
@@ -309,7 +313,7 @@ const shutterSeconds = name => name === 'B' || name === 'T' ? 1 : name.includes(
 class SimTransport {
   constructor() {
     this.kind = 'demo'; this.q = []; this.waiters = []; this.data = []; this.dataWaiters = [];
-    this.vals = {[P.MODE]:'i0', [P.APERTURE]:'r38000a', [P.SHUTTER]:'r1003c', [P.ISO]:'f4079000000000000', [P.FIRMWARE]:'S10,v1.25.0-42', [P.MODEL]:'S18,Hasselblad X1D-50c', [P.SERIAL]:'S10,DEMO000001', [P.FOCAL]:'i90', [P.BATTERY]:'i41', [P.LENS]:'i1', [P.LIVE]:'i1', [P.LEFT]:'i8', [P.DRIVE]:'i0', [P.TETHER]:'I2,1,1'};
+    this.vals = {[P.MODE]:'i0', [P.EV]:'fbff0000000000000', [P.APERTURE]:'r38000a', [P.SHUTTER]:'r1003c', [P.ISO]:'f4079000000000000', [P.FIRMWARE]:'S10,v1.25.0-42', [P.MODEL]:'S18,Hasselblad X1D-50c', [P.SERIAL]:'S10,DEMO000001', [P.FOCAL]:'i90', [P.BATTERY]:'i41', [P.LENS]:'i1', [P.LIVE]:'i1', [P.LEFT]:'i8', [P.DRIVE]:'i0', [P.TETHER]:'I2,1,1'};
     this.token = 0x0610; this.evseq = 60;
   }
   async open() {}
@@ -327,7 +331,7 @@ class SimTransport {
     else if (op === OP.DESCRIBE) this.reply(seq, 0x86, te.encode('\x01\x00MLi0,0,0'));
     else if (op === OP.WRITE) {
       const s = td.decode(val);
-      if ([P.ISO, P.APERTURE, P.SHUTTER].includes(code)) this.setVal(code, s); else this.vals[code] = s;
+      if ([P.ISO, P.APERTURE, P.SHUTTER, P.EV].includes(code)) this.setVal(code, s); else this.vals[code] = s;
       this.reply(seq, 0x83, ack(code === P.TETHER || code === P.DRIVE ? 13 : 0));
     } else if (op === OP.ACTION) {
       this.reply(seq, 0x81, ack(0));
@@ -634,11 +638,11 @@ window.X1D = {attach: t => attach(t), encodeFrame, Reassembler, decodeTyped, enc
 
 /* ============================== UI ============================== */
 const $ = id => document.getElementById(id);
-const S = {cam: null, mode: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 41, lv: true, focus: 430, subject: 640, step: 125, delay: 0, reps: 1, busy: false, shots: 0, real: false};
+const S = {cam: null, mode: 0, ev: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 41, lv: true, focus: 430, subject: 640, step: 125, delay: 0, reps: 1, busy: false, shots: 0, real: false};
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-21g · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-22a · ' + navigator.userAgent);
 $('btnLog').onclick = () => saveFile(new Blob([logLines.join('\n')], {type: 'text/plain'}), 'x1d_log_' + stamp() + '.txt');
 $('logBox').addEventListener('toggle', () => { logEl.textContent = logLines.join('\n'); logEl.scrollTop = 1e9; });
 const say = s => { $('state').textContent = s; };
@@ -659,17 +663,27 @@ function nearestShutter() {             // a metered speed between stops: the ne
 }
 /* the rail's ‹ › buttons step one stop along the same order as the strips (B is skipped) */
 function stepExp(kind, d) {
+  if (kind === 'ev') { const k = Math.round(S.ev * 3) + d; if (k >= -15 && k <= 15) setExp('ev', k / 3); return; }   // 1/3 EV per tap
   const list = kind === 'sh' ? shutterChoices.filter(n => n !== 'B') : kind === 'ap' ? APERTURES.map(a => a[2]) : ISOS;
   const cur = kind === 'sh' ? nearestShutter() : kind === 'ap' ? S.ap : S.iso;
   const i = list.indexOf(cur), j = i < 0 ? 0 : Math.max(0, Math.min(list.length - 1, i + d));
   if (j !== i) setExp(kind, list[j]);
 }
 document.querySelectorAll('.tile .arr').forEach(b => b.onclick = () => stepExp(b.dataset.k, +b.dataset.d));
+/* exposure compensation: the camera describes it as -5 to +5 EV in 1/3 steps (a double) */
+const EV_STEPS = Array.from({length: 31}, (_, i) => (i - 15) / 3);
+const evName = v => { const t = Math.round(v * 3) / 3; return Math.abs(t) < 0.05 ? '0' : (t > 0 ? '+' : '−') + Math.abs(t).toFixed(1); };
+const evChoices = EV_STEPS.map(evName);
 function renderDials() {
   const shOn = nearestShutter();
   buildStrip($('sS'), shutterChoices, shOn, v => setExp('sh', v));
   buildStrip($('sA'), APERTURES.map(a => a[2]), S.ap, v => setExp('ap', v));
   buildStrip($('sI'), ISOS.map(String), String(S.iso), v => setExp('iso', +v));
+  buildStrip($('sE'), evChoices, evName(S.ev), v => setExp('ev', EV_STEPS[evChoices.indexOf(v)]));
+  const evLocked = S.mode === 0 || S.mode === 10;                 // M and video: the camera picks nothing, so compensation has no effect
+  $('dE').classList.toggle('lock', evLocked); $('lE').textContent = evLocked ? 'A, S and P only' : evName(S.ev) + ' EV';
+  $('roEbox').hidden = evLocked || Math.abs(S.ev) < 0.05; $('roE').textContent = evName(S.ev);
+  $('tE').hidden = evLocked; $('tvE').textContent = evName(S.ev);    // rail tile only where it does something (A, S, P)
   $('lS').textContent = S.sh; $('lA').textContent = 'f/' + S.ap; $('lI').textContent = S.iso;
   $('roS').textContent = S.sh; $('roA').textContent = S.ap; $('roI').textContent = S.iso;
   $('tvS').textContent = S.sh; $('tvA').textContent = 'f/' + S.ap; $('tvI').textContent = S.iso;
@@ -685,6 +699,7 @@ async function setExp(kind, v) {
   if (!S.cam) return;
   try {
     if (kind === 'iso') await S.cam.write(P.ISO, encDouble(v));
+    if (kind === 'ev') { const ack = await S.cam.write(P.EV, encDouble(v)); if (ack !== 0) throw new Error('code ' + ack); }
     if (kind === 'ap') { const a = APERTURES.find(x => x[2] === v); await S.cam.write(P.APERTURE, encRational(a[0], a[1])); }
     if (kind === 'sh') { const s = SHUTTERS.find(x => x.name === v); await S.cam.write(P.SHUTTER, encRational(s.v >>> 16, s.v & 0xffff)); }
   } catch (e) { S[kind] = prev; renderDials(); draw(); say('Camera did not accept that: ' + e.message); }
@@ -742,6 +757,7 @@ function onEvent(ev) {
   if (ev.type !== 'changed') return;
   const v = ev.value;
   if (ev.code === P.ISO) S.iso = Math.round(v);
+  else if (ev.code === P.EV && typeof v === 'number') S.ev = v;
   else if (ev.code === P.APERTURE && v && v.num) S.ap = apertureName(v);
   else if (ev.code === P.SHUTTER && v && v.num != null) { const n = shutterName(v); if (n !== 'auto') S.sh = n; }
   else if (ev.code === P.BATTERY) S.battery = v;
@@ -775,7 +791,8 @@ async function attach(t) {
   await cam.connect(p => { if (gen === attachGen) { showProg(p); if (real) say('Connecting… ' + Math.round(p * 100) + '%'); } }, () => cam.cancelled || gen !== attachGen);
   if (cam.cancelled || gen !== attachGen) { log('attach #' + gen + ' superseded'); cam.stopKeepAlive(); return; }
   connecting = null; hideProg(); S.cam = cam;
-  const [mode, iso, ap, sh, bat, model, fw, focal] = await Promise.all([P.MODE, P.ISO, P.APERTURE, P.SHUTTER, P.BATTERY, P.MODEL, P.FIRMWARE, P.FOCAL].map(c => cam.read(c).catch(() => null)));
+  const [mode, iso, ap, sh, bat, model, fw, focal, evc] = await Promise.all([P.MODE, P.ISO, P.APERTURE, P.SHUTTER, P.BATTERY, P.MODEL, P.FIRMWARE, P.FOCAL, P.EV].map(c => cam.read(c).catch(() => null)));
+  if (typeof evc === 'number') S.ev = evc;
   S.mode = mode ?? 0; if (iso) S.iso = Math.round(iso); if (ap && ap.num) S.ap = apertureName(ap); if (sh && sh.num != null && shutterName(sh) !== 'auto') S.sh = shutterName(sh);
   if (bat != null) S.battery = bat; S.lv = !S.real;
   $('ovLens').textContent = focal ? `XCD ${focal} mm` : 'lens';
