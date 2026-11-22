@@ -46,7 +46,9 @@ button{font:inherit;color:inherit}
 .vf canvas.histo{inset:auto;left:14px;top:58px;width:192px;height:80px;border-radius:8px;pointer-events:none}
 .ov{position:absolute;left:0;right:0;display:flex;align-items:center;gap:14px;padding:10px 14px;font-size:15px;pointer-events:none}
 .ov.top{top:0;background:linear-gradient(rgba(0,0,0,.55),transparent)}
-.ov.bot{bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.65));padding-top:28px;flex-wrap:wrap}
+.ov.bot{bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.65));padding-top:28px;flex-wrap:nowrap}
+#btnZoom{min-width:88px;justify-content:center}   /* same width for 1x and 100%, so nothing jumps */
+@media(max-width:600px){.ov.bot{gap:8px}.ov.bot .ro{font-size:19px}.peakb span{display:none}.zoomb.peakb{padding:0 12px}}   /* phone cover screen: Peaking as an icon so the row never wraps */
 .zoomb.peakb{order:8;margin-left:auto}.peakb+.zoomb{margin-left:0}
 .zoomb{order:9;margin-left:auto;display:flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;font-weight:600}.zoomb.on{background:#ff7a2f;border-color:#ff7a2f;color:#17191b}
 .lvb{pointer-events:auto;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid rgba(241,239,233,.5);background:rgba(0,0,0,.35);font-size:14px;cursor:pointer}
@@ -914,7 +916,7 @@ const S = {cam: null, mode: 0, ev: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-22m · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-22n · ' + navigator.userAgent);
 /* Experiment: the X1D II zooms its live view on the camera when the live-view command's first byte is "start + 1"
    followed by a packed centre point (y*10000 << 16 | x*10000). The X1D-50c starts with 0x01, so try 0x02 and 0x03 at the
    centre, 3 s each, logging the camera's answer and the frame size, then return to normal live view. */
@@ -992,7 +994,7 @@ function renderDials() {
   $('roEbox').hidden = evLocked || Math.abs(S.ev) < 0.05; $('roE').textContent = evName(S.ev);
   $('rEV').hidden = evLocked; $('reVal').textContent = 'EV ' + evName(S.ev);   // rail keys only where it does something (A, S, P)
   $('lS').textContent = S.sh; $('lA').textContent = 'f/' + S.ap; $('lI').textContent = isoName(S.iso);
-  $('roS').textContent = S.sh; $('roA').textContent = S.ap; $('roI').textContent = isoName(S.iso);
+  $('roS').textContent = S.sh; $('roA').textContent = S.ap; $('roI').textContent = S.iso < 0 ? 'A' : S.iso;   // compact in the viewfinder
   $('tvS').textContent = S.sh; $('tvA').textContent = 'f/' + S.ap; $('tvI').textContent = isoName(S.iso);
   $('ovMode').textContent = MODE_LETTER[S.mode] || '?'; $('modeTxt').textContent = MODES[S.mode] || 'Unknown';
   $('dS').classList.toggle('lock', !(S.mode === 0 || S.mode === 2 || S.mode === 10));
