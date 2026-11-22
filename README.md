@@ -5,13 +5,23 @@ A remote for the original **Hasselblad X1D-50c**, run from a browser on an Andro
 **Open it:** https://tether.rikardwallen.com (also at https://rikardwallen.github.io/x1d-remote/)
 
 ## What it does
-- Fires the shutter, with a self-timer and bursts.
-- Sets shutter speed, aperture and ISO.
-- Autofocus, plus manual focus steps.
-- Live view from the camera's own sensor stream, at about 5 fps.
-- Imports each shot to the device as the full 110 MB **3FR RAW**, a JPEG made from the camera's built-in 1440 × 1080 preview, or both.
-- Auto-imports photos taken with the camera's own shutter button while it's connected.
-- Lists what's on the camera's card.
+- **Shutter:** fire it from the app, with a self-timer, bursts and time-lapse (interval shooting).
+- **Exposure:** shutter speed, aperture, ISO and exposure compensation. In A, S and P modes the camera's metered shutter speed is shown.
+- **Focus:** autofocus and manual focus steps.
+- **Live view** from the camera's own sensor stream:
+  - Starts automatically when the camera connects.
+  - Focus aids: peaking, a 2×/4× magnifier (tap the picture to magnify that spot), a grid and a histogram.
+- **Import:** every shot can be copied to the device as the full 110 MB **3FR RAW**, a JPEG, or both.
+  - The JPEG is made from the camera's built-in 1440 × 1080 preview and carries the camera's metadata (date, camera, lens, exposure).
+  - Optional direct upload to an **Immich** server.
+- **Shots taken on the camera** with its own shutter button while connected are imported too.
+- **Card contents:** lists what's on the camera's card.
+- **Connection:**
+  - Installs as an app from Chrome's menu or the *Install app* button.
+  - Keeps the screen awake while connected.
+  - Reconnects automatically when the cable is replugged.
+- **Battery:** warns when the camera battery runs low.
+- **Layout:** for the Fold's inner screen; a half-folded layout is included but untested.
 
 ## Use it
 1. Connect the camera to the phone or PC with a USB-C cable. Switch it on and close Phocus.
@@ -22,7 +32,7 @@ Before you connect, the page runs a demo camera, so you can try it without one.
 
 **Windows:** Chrome needs the camera on the WinUSB driver. Android and macOS need no driver.
 
-**White balance:** connecting sets white balance to 5000 K manual, the same as Phocus does. Change it back on the camera afterwards if you want.
+**White balance:** connecting sets white balance to 5000 K manual, the same as Phocus does. The app then puts your camera's own white balance back. You can turn this off under Import.
 
 ## Command-line tool
 `tools/x1d.py` is a Python driver using pyusb with the same features:

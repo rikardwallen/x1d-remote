@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#141516">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>X1D Remote</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
@@ -29,6 +32,7 @@ button{font:inherit;color:inherit}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--warn)}
 .pill.usb .dot{background:var(--ok)}.pill.off .dot{background:var(--bad)}
 .batt{display:inline-flex;align-items:center;gap:6px;font-size:15px}
+.batt.low{color:#ff5a4f}.batt.low i{border-color:#ff5a4f}.batt.low b{background:#ff5a4f}
 .batt i{display:inline-block;width:26px;height:12px;border:1.5px solid var(--alu2);border-radius:3px;position:relative}
 .batt i::after{content:"";position:absolute;right:-4px;top:3px;width:2px;height:4px;background:var(--alu2)}
 .batt b{position:absolute;left:1.5px;top:1.5px;bottom:1.5px;background:var(--alu);border-radius:1px}
@@ -38,6 +42,8 @@ button{font:inherit;color:inherit}
 .app{display:grid;grid-template-columns:minmax(0,clamp(420px,calc((100vh - 250px) * 4 / 3),calc(100% - 276px))) minmax(244px,1fr);grid-template-columns:minmax(0,clamp(420px,calc((100dvh - 250px) * 4 / 3),calc(100% - 276px))) minmax(244px,1fr);grid-template-areas:"vf rail" "ses ses" "ctl ctl";grid-template-rows:auto;gap:16px;align-items:start;padding:16px max(16px,env(safe-area-inset-right)) 16px max(16px,env(safe-area-inset-left));max-width:1400px;margin:0 auto}
 .vf{grid-area:vf;position:relative;aspect-ratio:4/3;background:#000;border-radius:14px;overflow:hidden;border:1px solid var(--edge);align-self:start}
 .vf canvas{position:absolute;inset:0;width:100%;height:100%}
+.grid3{position:absolute;inset:0;pointer-events:none;background:linear-gradient(to right,transparent calc(33.333% - .5px),rgba(241,239,233,.45) calc(33.333% - .5px),rgba(241,239,233,.45) calc(33.333% + .5px),transparent calc(33.333% + .5px),transparent calc(66.667% - .5px),rgba(241,239,233,.45) calc(66.667% - .5px),rgba(241,239,233,.45) calc(66.667% + .5px),transparent calc(66.667% + .5px)),linear-gradient(to bottom,transparent calc(33.333% - .5px),rgba(241,239,233,.45) calc(33.333% - .5px),rgba(241,239,233,.45) calc(33.333% + .5px),transparent calc(33.333% + .5px),transparent calc(66.667% - .5px),rgba(241,239,233,.45) calc(66.667% - .5px),rgba(241,239,233,.45) calc(66.667% + .5px),transparent calc(66.667% + .5px))}
+.vf canvas.histo{inset:auto;left:14px;top:58px;width:192px;height:80px;border-radius:8px;pointer-events:none}
 .ov{position:absolute;left:0;right:0;display:flex;align-items:center;gap:14px;padding:10px 14px;font-size:15px;pointer-events:none}
 .ov.top{top:0;background:linear-gradient(rgba(0,0,0,.55),transparent)}
 .ov.bot{bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.65));padding-top:28px;flex-wrap:wrap}
@@ -115,6 +121,7 @@ button{font:inherit;color:inherit}
 .prog{height:4px;border-radius:2px;background:#2a2c2f;margin-top:6px;overflow:hidden}.prog i{display:block;height:100%;width:0;background:var(--org)}
 #cardBox{margin-top:12px;font-size:14px}#cardBox summary{cursor:pointer;color:var(--dim);min-height:28px}
 #cardList{max-height:220px;overflow:auto;font:13px/1.5 ui-monospace,Consolas,monospace;color:#c8cacc;margin-top:6px}
+.inp{width:100%;min-height:44px;margin-top:8px;padding:0 12px;border-radius:10px;border:1px solid #33363a;background:#1b1d1f;color:inherit;font:inherit;font-size:15px}
 .chk{display:flex;align-items:center;gap:8px;min-height:36px;font-size:14px}.chk input{width:20px;height:20px;accent-color:var(--org)}
 .log{margin:0 auto 24px;max-width:1400px;padding:0 max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
 .log details{background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:10px 14px}
@@ -125,6 +132,12 @@ button{font:inherit;color:inherit}
 .modal.on{display:grid}
 .modal .card{max-width:460px;font-size:15px}
 .modal p{margin:0 0 10px}
+@media (vertical-viewport-segments: 2){
+  .bar{display:none}
+  .app{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"vf vf" "rail ctl" "ses ses";row-gap:calc(env(viewport-segment-top 0 1) - env(viewport-segment-bottom 0 0) + 24px);padding-top:8px}
+  .vf{height:calc(env(viewport-segment-height 0 0) - 16px);width:auto;max-width:100%;justify-self:center;aspect-ratio:4/3}
+  .tiles{display:none}
+}
 @media(max-width:860px){.app{grid-template-columns:minmax(0,1fr);grid-template-areas:"vf" "rail" "ctl" "ses";grid-template-rows:auto}.vf{aspect-ratio:4/3}.ctl{display:flex;flex-direction:column;align-items:stretch}.rail{max-width:none}.tiles{display:none}.rail .shotc .rfocus{order:0;margin-top:12px;background:none;border:0;padding:0}.rail .shotc{display:block;background:var(--panel);border:1px solid var(--edge);padding:14px}.rail .shoot{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}.rail .shoot .rel{width:96px;height:96px;margin-top:0}.rail .opts .seg{flex:none}}
 @media(max-width:600px){.brand small{display:none}#btnConnect{flex:1}.rel{width:84px;height:84px}.ov{font-size:13px;gap:10px}.meter svg{width:110px}}
 @media(prefers-reduced-motion:reduce){.flash.go{animation:none}}
@@ -135,6 +148,7 @@ button{font:inherit;color:inherit}
   <div class="brand">X1D Remote <small>for Hasselblad X1D-50c</small></div>
   <span class="pill" id="conn"><span class="dot"></span><span id="connTxt">Demo camera</span></span>
   <span class="batt num" id="batt" title="Camera battery"><i><b id="battFill" style="width:40%"></b></i><span id="battTxt">41%</span></span>
+  <button class="btn" id="btnInstall" hidden>Install app</button>
   <button class="btn" id="btnFull" aria-label="Full screen" title="Full screen" style="width:44px;padding:0;display:grid;place-items:center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4"/></svg></button>
   <button class="btn alu" id="btnConnect">Connect camera</button>
 </header>
@@ -142,6 +156,8 @@ button{font:inherit;color:inherit}
 <main class="app">
   <section class="vf" id="vf" aria-label="Viewfinder">
     <canvas id="cv"></canvas>
+    <div class="grid3" id="grid3" hidden></div>
+    <canvas class="histo" id="histo" width="192" height="80" hidden></canvas>
     <div class="flash" id="flash"></div>
     <div class="msg" id="vfMsg"></div>
     <div class="ov top num">
@@ -206,6 +222,13 @@ button{font:inherit;color:inherit}
       </div>
       <div class="fbar" id="fbar"><u id="fdof"></u><i id="fpos"></i></div>
       <div class="fnote"><span>near</span><span id="fsharp">soft</span><span>far</span></div>
+      <div class="row" style="margin-top:12px;gap:16px;flex-wrap:wrap">
+        <label class="chk"><input type="checkbox" id="chkGrid"> Grid</label>
+        <label class="chk"><input type="checkbox" id="chkHisto"> Histogram</label>
+      </div>
+      <div class="foot">Tap the live picture to magnify that spot (2×); tap again to move it. The magnifier button steps 1× / 2× / 4×.</div>
+      <button class="btn" id="btnFeatures" style="margin-top:10px">Check camera features (read only)</button>
+      <div class="foot" id="featMsg">Asks the camera which settings it supports, including whether the focus point can be moved (needed for tap to focus). Changes nothing.</div>
     </div>
 
     <div class="card">
@@ -214,7 +237,29 @@ button{font:inherit;color:inherit}
         <div class="seg" id="segImp"><button data-i="raw">RAW</button><button data-i="both" class="on">RAW + JPEG</button><button data-i="jpeg">JPEG</button></div></div>
       <label class="chk"><input type="checkbox" id="chkSave" checked> Save to Downloads automatically</label>
       <label class="chk"><input type="checkbox" id="chkBody" checked> Also import shots taken on the camera</label>
+      <div class="row" style="justify-content:space-between;margin-top:6px"><span style="font-size:14px">File names</span>
+        <div class="seg" id="segName"><button data-n="date" class="on">Date &amp; time</button><button data-n="camera">Camera number</button></div></div>
+      <label class="chk"><input type="checkbox" id="chkWB" checked> Keep the camera's own white balance (connecting sets 5000 K, as Phocus does; this puts yours back)</label>
       <div class="foot" id="impNote">RAW is the full 110 MB 3FR, saved to Downloads (your gallery won't show 3FR files; open them from Files or Lightroom). JPEG is the 1440 × 1080 preview the camera stores inside every RAW, for quick sharing.</div>
+    </div>
+
+    <div class="card" id="immichCard">
+      <h2>Immich <em class="num" id="immichState">off</em></h2>
+      <label class="chk"><input type="checkbox" id="chkImmich"> Upload each imported shot to my Immich server</label>
+      <input class="inp" id="immichUrl" type="url" inputmode="url" placeholder="https://photos.example.com" autocomplete="off">
+      <input class="inp" id="immichKey" type="password" placeholder="API key (Immich: Account settings → API keys)" autocomplete="off">
+      <div class="row" style="margin-top:8px"><button class="btn" id="btnImmichTest">Test connection</button></div>
+      <div class="foot" id="immichMsg">Sends the same files as the import choice above. The address and key stay on this device. Your Immich server must be reachable over https and allow requests from tether.rikardwallen.com (CORS).</div>
+
+    <div class="card" id="tlCard">
+      <h2>Time-lapse <em class="num" id="tlState">off</em></h2>
+      <div class="row" style="justify-content:space-between"><span style="font-size:14px">Every</span>
+        <div class="seg" id="segTlI"><button data-i="5">5 s</button><button data-i="10" class="on">10 s</button><button data-i="30">30 s</button><button data-i="60">1 min</button><button data-i="300">5 min</button></div></div>
+      <div class="row" style="justify-content:space-between;margin-top:8px"><span style="font-size:14px">Frames</span>
+        <div class="seg" id="segTlN"><button data-n="10" class="on">10</button><button data-n="50">50</button><button data-n="100">100</button><button data-n="0">Until stopped</button></div></div>
+      <div class="row" style="margin-top:10px"><button class="btn alu" id="btnTl">Start time-lapse</button></div>
+      <div class="foot" id="tlMsg">Each frame is imported like a normal shot. Live view is paused while it runs, to save battery. The interval counts from the start of each frame, and a RAW copy takes a few seconds.</div>
+    </div>
     </div>
 
   </section>
@@ -389,9 +434,16 @@ class SimTransport {
   static fake3FRHead() {
     const W = 1440, H = 1080, OFF = 7680, head = new Uint8Array(6 << 20), dv = new DataView(head.buffer);
     head.set([0x49,0x49,0x2a,0,8,0,0,0]);
-    const tags = [[256,4,W],[257,4,H],[258,3,200],[259,3,1],[262,3,2],[273,4,OFF],[277,3,3],[278,4,H],[279,4,W*H*3]];
-    dv.setUint16(8, tags.length, true);
-    tags.forEach(([t, ty, v], i) => { const e = 10 + 12 * i; dv.setUint16(e, t, true); dv.setUint16(e + 2, ty, true); dv.setUint32(e + 4, t === 258 ? 3 : 1, true); ty === 3 && t !== 258 ? dv.setUint16(e + 8, v, true) : dv.setUint32(e + 8, v, true); });
+    const d = new Date(), p2 = n => String(n).padStart(2, '0');
+    const when = `${d.getFullYear()}:${p2(d.getMonth() + 1)}:${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}\0`;
+    const str = (at, t) => { head.set(te.encode(t), at); return t.length; };
+    const nMake = str(300, 'Hasselblad\0'), nModel = str(320, 'Hasselblad X1D (demo)\0'), nDate = str(350, when), nDate2 = str(560, when), nLens = str(600, 'XCD 90\0');
+    dv.setUint32(520, 1, true); dv.setUint32(524, 60, true); dv.setUint32(528, 56, true); dv.setUint32(532, 10, true); dv.setUint32(536, 90, true); dv.setUint32(540, 1, true);
+    // [tag, type, count, value-or-offset]: the preview IFD plus the camera tags the app copies into its JPEG
+    const tags = [[256,4,1,W],[257,4,1,H],[258,3,3,200],[259,3,1,1],[262,3,1,2],[271,2,nMake,300],[272,2,nModel,320],[273,4,1,OFF],[277,3,1,3],[278,4,1,H],[279,4,1,W*H*3],[306,2,nDate,350],[34665,4,1,400]];
+    const put = (off, list) => { dv.setUint16(off, list.length, true); list.forEach(([t, ty, n, v], i) => { const e = off + 2 + 12 * i; dv.setUint16(e, t, true); dv.setUint16(e + 2, ty, true); dv.setUint32(e + 4, n, true); ty === 3 && n === 1 ? dv.setUint16(e + 8, v, true) : dv.setUint32(e + 8, v, true); }); dv.setUint32(off + 2 + 12 * list.length, 0, true); };
+    put(8, tags);
+    put(400, [[33434,5,1,520],[33437,5,1,528],[34855,3,1,S.iso || 400],[36867,2,nDate2,560],[37386,5,1,536],[42036,2,nLens,600]]);
     dv.setUint16(200, 8, true); dv.setUint16(202, 8, true); dv.setUint16(204, 8, true);
     const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
     g.drawImage(cv, 0, 0, W, H); const px = g.getImageData(0, 0, W, H).data;
@@ -433,6 +485,7 @@ class Camera {
   static event(op, b) {
     if (op === 0x40 && b.length >= 9) { const dv = new DataView(b.buffer, b.byteOffset); return {type:'image', token: dv.getUint32(1, true), size: dv.getUint32(5, true), format: td.decode(b.slice(10, 10 + (b[9] || 0)))}; }
     if (op === 0x42 && b.length) return {type:'changed', code: b[0], value: decodeTyped(b.slice(1))};
+    if (op === 0x45) { const t = td.decode(b).replace(/[^\x20-\x7e]+/g, ' ').trim(); return {type:'file', text: t, name: (t.match(/B\d{7}/) || [null])[0]}; }
     return {type:'event', op};
   }
   call(op, code = null, value = new Uint8Array(), timeout = 4000, quiet = false) {
@@ -478,6 +531,11 @@ class Camera {
       const [o, c, v] = items[i].split(':'); const op = +o, code = c === '-' ? null : parseInt(c, 16);
       let val = unhex(v);
       if (op === OP.WRITE && code === 0x07 && last[7] && last[7].length) val = last[7];   // EV: write back what the camera reported
+      if (op === OP.WRITE && code === 0x46 && !this.wbOrig) {                            // remember the camera's own white balance before Phocus's 5000 K
+        this.wbOrig = [];
+        for (const wc of [0x46, 0x47, 0x48, 0x30]) { try { const r = await this.call(OP.READ, wc, undefined, 3000, true); if (r && r.length) this.wbOrig.push([wc, r]); } catch (e) {} }
+        this.log('white balance before connect: ' + this.wbOrig.map(([c, r]) => '0x' + c.toString(16) + ' ' + td.decode(r)).join(', '));
+      }
       let r; try { r = await this.call(op, code, val, 4000, op === OP.READ || op === OP.DESCRIBE || op === OP.INDEXED); } catch (e) { this.log('connect step ' + i + ': ' + e.message); continue; }
       if (op === OP.READ) last[code] = r;
       if (op === OP.LIST) this.codes = r;
@@ -487,6 +545,13 @@ class Camera {
     }
     if (cancelled()) return;
     this.startKeepAlive();
+  }
+  async restoreWhiteBalance() {
+    if (!this.wbOrig || !this.wbOrig.length) return null;
+    const acks = [];
+    for (const [c, r] of this.wbOrig) { try { acks.push(Camera.ack(await this.call(OP.WRITE, c, r))); } catch (e) { acks.push('x'); } }
+    this.log('white balance restored: acks ' + acks.join(','));
+    return acks;
   }
   startKeepAlive() {
     this.stopKeepAlive(); let n = 0, busy = false;
@@ -618,6 +683,18 @@ function applyPeaking(img) {
   const mg = 4;                                  // skip the picture's outer edge
   for (let y = mg; y < h - mg; y++) for (let x = mg, i = y * w + mg, k = i * 4; x < w - mg; x++, i++, k += 4) if (M[i] >= thr) { d[k] = 255; d[k + 1] = 40; d[k + 2] = 40; }
 }
+/* histogram of the live picture (luminance, from the displayed pixels) */
+const HISTO = {on: false};
+function drawHistogram(d) {
+  if (!HISTO.on) return;
+  const bins = new Uint32Array(64), n = d.length / 4, step = Math.max(1, Math.floor(n / 60000));
+  for (let i = 0; i < n; i += step) { const k = i * 4; bins[(d[k] * 54 + d[k + 1] * 183 + d[k + 2] * 19) >> 10]++; }
+  const c = $('histo'), g = c.getContext('2d'), W = c.width, H = c.height; let mx = 1; for (const v of bins) mx = Math.max(mx, v);
+  g.clearRect(0, 0, W, H); g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 0, W, H);
+  g.fillStyle = 'rgba(241,239,233,.85)'; for (let i = 0; i < 64; i++) { const h = Math.round(Math.sqrt(bins[i] / mx) * (H - 8)); g.fillRect(i * 3, H - 4 - h, 2, h); }
+  if (bins[63] > n / step * 0.005) { g.fillStyle = '#ff5a4f'; g.fillRect(W - 4, 0, 4, H); }      // clipping highlights
+  if (bins[0] > n / step * 0.02) { g.fillStyle = '#5aa0ff'; g.fillRect(0, 0, 4, H); }            // crushed shadows
+}
 function drawZoomMap(tc, W, H) {       // small inset: where the magnified area sits in the frame
   if (ZOOM.z === 1) return;
   const d = W / (tc.canvas.clientWidth || W), mw = 96 * d, mh = 72 * d, mx = W - mw - 14 * d, my = 58 * d;
@@ -669,6 +746,7 @@ function renderLiveFrame(f, target) {
       d[k] = lut[r < 0 ? 0 : r > 4095 ? 4095 : r | 0]; d[k + 1] = lut[g < 0 ? 0 : g > 4095 ? 4095 : g | 0]; d[k + 2] = lut[b < 0 ? 0 : b > 4095 ? 4095 : b | 0]; d[k + 3] = 255;
     }
   }
+  drawHistogram(d);
   if (PEAK.on) { const keep = LVR.peakBuf && LVR.peakBuf.length === d.length ? LVR.peakBuf : (LVR.peakBuf = new Uint8ClampedArray(d.length)); keep.set(d); applyPeaking(LVR.img); LVR.off.getContext('2d').putImageData(LVR.img, 0, 0); d.set(keep); }
   else LVR.off.getContext('2d').putImageData(LVR.img, 0, 0);
   const tc = target.getContext('2d'); tc.imageSmoothingQuality = 'high';
@@ -676,6 +754,57 @@ function renderLiveFrame(f, target) {
   tc.drawImage(LVR.off, 0, 4, w - 4, h - 4, 0, 0, target.width, target.height);   // trim the sensor's blank edge rows/columns    // 2816 x 1260 covers the 4:3 sensor: stretch to the 4:3 viewfinder
   return true;
 }
+/* --- EXIF for the JPEG: copy the camera's own tags out of the 3FR (date, camera, lens, exposure) --- */
+const EXIF_IFD0 = [271, 272, 305, 306], EXIF_SUB = [33434, 33437, 34850, 34855, 36867, 36868, 37380, 37383, 37386, 41986, 41987, 42035, 42036, 42037];
+const TSIZE = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8, 11: 4, 12: 8};
+function readIFD(dv, off, want) {
+  const out = []; if (off + 2 > dv.byteLength) return out;
+  const n = dv.getUint16(off, true);
+  for (let i = 0; i < n; i++) {
+    const e = off + 2 + 12 * i; if (e + 12 > dv.byteLength) break;
+    const tag = dv.getUint16(e, true), type = dv.getUint16(e + 2, true), count = dv.getUint32(e + 4, true), size = (TSIZE[type] || 1) * count;
+    if (want && !want.includes(tag)) continue;
+    const at = size <= 4 ? e + 8 : dv.getUint32(e + 8, true); if (at + size > dv.byteLength || size > 4096) continue;
+    out.push({tag, type, count, bytes: new Uint8Array(dv.buffer, dv.byteOffset + at, size).slice(), raw: dv.getUint32(e + 8, true)});
+  }
+  return out;
+}
+function exifTags(head) {          // -> {ifd0, sub, dateOriginal} or null
+  try {
+    const dv = new DataView(head.buffer, head.byteOffset, head.byteLength);
+    if (dv.getUint32(0) !== 0x49492a00) return null;
+    const all0 = readIFD(dv, dv.getUint32(4, true));
+    const ifd0 = all0.filter(e => EXIF_IFD0.includes(e.tag)), ptr = all0.find(e => e.tag === 34665);
+    const sub = ptr ? readIFD(dv, ptr.raw, EXIF_SUB) : [];
+    const dto = sub.find(e => e.tag === 36867) || ifd0.find(e => e.tag === 306);
+    return {ifd0, sub, dateOriginal: dto ? td.decode(dto.bytes).replace(/\0.*$/, '') : null};
+  } catch (e) { return null; }
+}
+function buildExif(t) {           // a small little-endian TIFF: IFD0 (+ pointer) and the Exif sub-IFD, data after
+  const ifd0 = [...t.ifd0, {tag: 34665, type: 4, count: 1, bytes: new Uint8Array(4)}].sort((a, b) => a.tag - b.tag), sub = [...t.sub].sort((a, b) => a.tag - b.tag);
+  const o0 = 8, o1 = o0 + 2 + 12 * ifd0.length + 4; let dataAt = o1 + 2 + 12 * sub.length + 4;
+  const blobs = [], place = e => { if (e.bytes.length <= 4) return null; const at = dataAt; blobs.push([at, e.bytes]); dataAt += e.bytes.length + (e.bytes.length & 1); return at; };
+  const layout = [ifd0, sub].map(list => list.map(e => ({e, at: place(e)})));
+  const buf = new Uint8Array(dataAt), dv = new DataView(buf.buffer);
+  buf.set([0x49, 0x49, 0x2a, 0, 8, 0, 0, 0]);
+  [[o0, layout[0]], [o1, layout[1]]].forEach(([off, list]) => {
+    dv.setUint16(off, list.length, true);
+    list.forEach(({e, at}, i) => { const p = off + 2 + 12 * i; dv.setUint16(p, e.tag, true); dv.setUint16(p + 2, e.type, true); dv.setUint32(p + 4, e.count, true);
+      if (e.tag === 34665) dv.setUint32(p + 8, o1, true); else if (at === null) buf.set(e.bytes, p + 8); else dv.setUint32(p + 8, at, true); });
+    dv.setUint32(off + 2 + 12 * list.length, 0, true);
+  });
+  for (const [at, b] of blobs) buf.set(b, at);
+  return buf;
+}
+async function jpegWithExif(jpeg, head) {   // insert an APP1 Exif segment right after the JPEG's SOI
+  const t = exifTags(head); if (!t || (!t.ifd0.length && !t.sub.length)) return jpeg;
+  const tiff = buildExif(t), app1 = new Uint8Array(4 + 6 + tiff.length);
+  app1.set([0xff, 0xe1, (app1.length - 2) >> 8, (app1.length - 2) & 255]); app1.set(te.encode('Exif\0\0'), 4); app1.set(tiff, 10);
+  const j = new Uint8Array(await jpeg.arrayBuffer());
+  return new Blob([j.subarray(0, 2), app1, j.subarray(2)], {type: 'image/jpeg'});
+}
+const exifDate = s => { const m = s && s.match(/^(\d{4}):(\d\d):(\d\d) (\d\d):(\d\d):(\d\d)/); return m ? new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null; };
+
 /* the uncompressed 1440 x 1080 RGB preview at the start of every 3FR -> canvas */
 function previewFrom3FR(head) {
   try {
@@ -690,7 +819,7 @@ function previewFrom3FR(head) {
     g.putImageData(img, 0, 0); return c;
   } catch (e) { return null; }
 }
-window.X1D = {attach: t => attach(t), encodeFrame, Reassembler, decodeTyped, encDouble, encRational, Camera, SimTransport, frameReply, LiveParser, renderLiveFrame, previewFrom3FR, parseCardList};
+window.X1D = {attach: t => attach(t), jpegWithExif, exifTags, encodeFrame, Reassembler, decodeTyped, encDouble, encRational, Camera, SimTransport, frameReply, LiveParser, renderLiveFrame, previewFrom3FR, parseCardList};
 
 /* ============================== UI ============================== */
 const $ = id => document.getElementById(id);
@@ -698,7 +827,7 @@ const S = {cam: null, mode: 0, ev: 0, iso: 400, ap: '5.6', sh: '1/60', battery: 
 window.X1D_STATE = S;   // for debugging from the console
 const logEl = $('log'); let logLines = [];
 const log = s => { logLines.push(new Date().toTimeString().slice(0,8) + ' ' + s); if (logLines.length > 3000) logLines = logLines.slice(-2500); if ($('logBox').open) logEl.textContent = logLines.join('\n'); };
-log('X1D Remote build 2026-11-22g · ' + navigator.userAgent);
+log('X1D Remote build 2026-11-22j · ' + navigator.userAgent);
 /* Experiment: the X1D II zooms its live view on the camera when the live-view command's first byte is "start + 1"
    followed by a packed centre point (y*10000 << 16 | x*10000). The X1D-50c starts with 0x01, so try 0x02 and 0x03 at the
    centre, 3 s each, logging the camera's answer and the frame size, then return to normal live view. */
@@ -724,6 +853,20 @@ $('btnZoomTest').onclick = async () => {
   } catch (e) { log('zoom test error: ' + e.message); say('Zoom test stopped: ' + e.message); }
   S.busy = false;
 };
+/* --- install as an app, offline shell, keep the screen awake while a camera is connected --- */
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(e => log('service worker: ' + e.message));
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('btnInstall').hidden = false; });
+$('btnInstall').onclick = async () => { if (!installEvt) return; installEvt.prompt(); const r = await installEvt.userChoice.catch(() => null); log('install: ' + (r && r.outcome)); installEvt = null; $('btnInstall').hidden = true; };
+window.addEventListener('appinstalled', () => { $('btnInstall').hidden = true; say('Installed. Open X1D Remote from your home screen.'); });
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (on && !wakeLock && 'wakeLock' in navigator && document.visibilityState === 'visible') { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); log('screen kept awake'); }
+    if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch (e) { log('keep awake: ' + e.message); }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.real && S.cam) keepAwake(true); });
 $('btnLog').onclick = () => saveFile(new Blob([logLines.join('\n')], {type: 'text/plain'}), 'x1d_log_' + stamp() + '.txt');
 $('logBox').addEventListener('toggle', () => { logEl.textContent = logLines.join('\n'); logEl.scrollTop = 1e9; });
 const say = s => { $('state').textContent = s; };
@@ -826,6 +969,7 @@ function draw() {
   if (ZOOM.z > 1) { const r = zoomRegion(W, H); ctx.drawImage(scene, r.x, r.y, r.w, r.h, 0, 0, W, H); } else ctx.drawImage(scene, 0, 0);
   ctx.filter = 'none';
   const noise = Math.max(0, Math.log2(S.iso / 800)) * 0.035; if (noise > 0) { ctx.globalAlpha = noise; for (let i = 0; i < 900; i++) { ctx.fillStyle = Math.random() < .5 ? '#fff' : '#000'; ctx.fillRect(Math.random()*W, Math.random()*H, 2, 2); } ctx.globalAlpha = 1; }
+  if (HISTO.on) drawHistogram(ctx.getImageData(0, 0, W, H).data);
   if (PEAK.on) { const im = ctx.getImageData(0, 0, W, H); applyPeaking(im); ctx.putImageData(im, 0, 0); }
   drawZoomMap(ctx, W, H);
   // focus bar
@@ -835,10 +979,39 @@ function draw() {
 }
 new ResizeObserver(sizeCanvas).observe(cv);
 
+/* --- camera battery: warn at 20% and 10% (live view drains about 10% in 15 minutes) --- */
+function checkBattery() {
+  if (!S.real || typeof S.battery !== 'number') return;
+  $('batt').classList.toggle('low', S.battery <= 15);
+  const level = S.battery <= 10 ? 10 : S.battery <= 20 ? 20 : 0;
+  if (level && (!S.battWarned || level < S.battWarned)) { S.battWarned = level; say(`Camera battery at ${S.battery}%.` + (S.lv ? ' Live view uses a lot of power; stop it between shots to save battery.' : '')); log('battery warning ' + S.battery + '%'); if ('vibrate' in navigator) navigator.vibrate(200); }
+}
+/* --- auto-connect: a camera this browser already has permission for connects without a tap,
+       on page load, when it's plugged in, and after a dropped connection (cable wiggle) --- */
+let reconnectTries = 0;
+async function autoConnect(dev, why) {
+  if (!dev || (S.real && S.cam && S.cam.alive) || (connecting && connecting.t.kind === 'usb')) return;
+  log('auto-connect (' + why + ')');
+  try { const t = new UsbTransport(dev); await t.open(); await attach(t); }
+  catch (e) { log('auto-connect failed: ' + e.message); hideProg(); setConn('off', 'Not connected'); }
+}
+async function findCamera() { if (!navigator.usb) return null; try { return (await navigator.usb.getDevices()).find(d => d.vendorId === VID && d.productId === PID) || null; } catch (e) { return null; } }
+if (navigator.usb) {
+  navigator.usb.addEventListener('connect', e => { if (e.device.vendorId === VID) { say('Camera plugged in. Connecting…'); setTimeout(() => autoConnect(e.device, 'plugged in'), 1500); } });
+  navigator.usb.addEventListener('disconnect', e => { if (e.device.vendorId === VID) log('camera unplugged'); });
+  setTimeout(async () => { const d = await findCamera(); if (d) autoConnect(d, 'already allowed'); }, 400);
+}
+function scheduleReconnect() {
+  if (reconnectTries >= 3) { say('Lost the camera. Check the cable, then tap Connect camera.'); return; }
+  reconnectTries++;
+  setTimeout(async () => { if (S.real && S.cam) return; const d = await findCamera(); if (d) { say('Reconnecting to the camera…'); autoConnect(d, 'reconnect ' + reconnectTries); } }, 2000 * reconnectTries);
+}
+
 /* --- camera events keep the app in step with the body --- */
 function onEvent(ev) {
-  if (ev.type === 'lost') { log('camera lost: ' + ev.error); setConn('off', 'Camera disconnected'); S.cam = null; S.lv = false; say('Lost the camera: ' + ev.error); return; }
+  if (ev.type === 'lost') { log('camera lost: ' + ev.error); keepAwake(false); setConn('off', 'Camera disconnected'); S.cam = null; S.lv = false; lvLabel(); say('Lost the camera: ' + ev.error); if (S.real) scheduleReconnect(); return; }
   if (ev.type === 'stalled') { log('camera stopped answering'); setConn('off', 'Camera not responding'); say('The camera stopped answering. Unplug and replug the cable, then tap Connect camera.'); vfMessage('The camera stopped answering.<br>Unplug and replug the cable, then tap <b>Connect camera</b>.'); return; }
+  if (ev.type === 'file') { log('camera wrote ' + ev.text); if (ev.name) S.lastFile = {name: ev.name, at: performance.now()}; return; }
   if (ev.type === 'image') { if (!S.expecting) bodyShot(ev); return; }
   if (ev.type !== 'changed') return;
   const v = ev.value;
@@ -846,7 +1019,7 @@ function onEvent(ev) {
   else if (ev.code === P.EV && typeof v === 'number') S.ev = v;
   else if (ev.code === P.APERTURE && v && v.num) S.ap = apertureName(v);
   else if (ev.code === P.SHUTTER && v && v.num != null) { const n = shutterName(v); if (n !== 'auto') S.sh = n; }
-  else if (ev.code === P.BATTERY) S.battery = v;
+  else if (ev.code === P.BATTERY) { S.battery = v; checkBattery(); }
   else if (ev.code === P.MODE) S.mode = v;
   else if (ev.code === P.LIVE) {
     if (!S.real) { S.lv = !!v; lvLabel(); }
@@ -888,7 +1061,8 @@ async function attach(t) {
   vfMessage('');
   $('meterBox').style.display = S.real ? 'none' : '';             // the meter is a demo-only estimate
   showCard(cam.cardPaths);
-  renderDials(); draw(); say(S.real ? 'Connected to your X1D' : 'Ready (demo camera)');
+  if (S.real && $('chkWB').checked) await cam.restoreWhiteBalance();
+  renderDials(); draw(); say(S.real ? 'Connected to your X1D' : 'Ready (demo camera)'); keepAwake(S.real); reconnectTries = 0; S.battWarned = 0; checkBattery();
   if (S.real) setTimeout(() => { if (S.cam === cam && !S.lv && !S.busy) setLive(true); }, 300);   // start live view straight away
 }
 const lvLabel = () => { $('ovLv').textContent = S.lv ? 'Stop live view' : 'Start live view'; };
@@ -938,6 +1112,47 @@ document.querySelectorAll('#segImp button').forEach(b => b.onclick = () => setIm
 try { const v = localStorage.getItem('x1d.imp'); if (v && /^(raw|both|jpeg)$/.test(v)) setImp(v); } catch (e) {}
 const stamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; };
 function saveFile(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
+/* --- file names: capture date (default) or the camera's own numbering (experimental) --- */
+S.naming = (() => { try { return localStorage.getItem('x1d.naming') || 'date'; } catch (e) { return 'date'; } })();
+function fileBase(taken) {
+  const p = n => String(n).padStart(2, '0'), d = taken;
+  const date = `X1D_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  if (S.naming !== 'camera') return date;
+  if (S.lastFile && performance.now() - S.lastFile.at < 15000 && S.lastFile.name) { const n = S.lastFile.name; S.lastFile = null; return n; }   // the camera told us (0x45)
+  const nums = (S.cam && S.cam.cardPaths || []).map(x => +(x.match(/B(\d{7})\.3FR$/i) || [0, 0])[1]).filter(Boolean);
+  S.nextB = Math.max(S.nextB || 0, nums.length ? Math.max(...nums) + 1 : 0);
+  if (!S.nextB) return date;
+  const name = 'B' + String(S.nextB++).padStart(7, '0'); log('file name predicted from the card: ' + name); return name;
+}
+/* --- Immich: optional direct upload of each imported shot (server URL + API key, kept on this device only) --- */
+const IMMICH = {
+  get url() { try { return (localStorage.getItem('x1d.immich.url') || '').replace(/\/+$/, ''); } catch (e) { return ''; } },
+  get key() { try { return localStorage.getItem('x1d.immich.key') || ''; } catch (e) { return ''; } },
+  on() { try { return localStorage.getItem('x1d.immich.on') === '1' && !!this.url && !!this.key; } catch (e) { return false; } },
+  demoToo: false,
+};
+let immichQueue = Promise.resolve(); window.X1D_IMMICH = IMMICH;
+async function immichUpload(blob, name, taken) {
+  const fd = new FormData(), when = taken.toISOString();
+  fd.append('deviceAssetId', name + '-' + blob.size); fd.append('deviceId', 'x1d-remote'); fd.append('fileCreatedAt', when); fd.append('fileModifiedAt', when); fd.append('isFavorite', 'false');
+  fd.append('assetData', new File([blob], name, {type: blob.type || 'application/octet-stream'}));
+  const r = await fetch(IMMICH.url + '/api/assets', {method: 'POST', headers: {'x-api-key': IMMICH.key, 'Accept': 'application/json'}, body: fd});
+  if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + (await r.text().catch(() => '')).slice(0, 120));
+  const j = await r.json().catch(() => ({})); log(`Immich: ${name} ${j.status || 'uploaded'}${j.id ? ' (' + j.id + ')' : ''}`); return j;
+}
+async function immichTest() {
+  const out = $('immichMsg'); out.textContent = 'Checking…';
+  try {
+    const p = await fetch(IMMICH.url + '/api/server/ping'); if (!p.ok) throw new Error('server answered ' + p.status);
+    const me = await fetch(IMMICH.url + '/api/users/me', {headers: {'x-api-key': IMMICH.key}});
+    if (!me.ok) throw new Error(me.status === 401 ? 'the API key was refused' : 'user check answered ' + me.status);
+    const u = await me.json(); out.textContent = `Connected to Immich as ${u.name || u.email}. New shots will upload as they're imported.`; out.style.color = 'var(--ok)';
+  } catch (e) {
+    out.style.color = '#ff5a4f';
+    out.textContent = /Failed to fetch|NetworkError|TypeError/.test(String(e)) ? 'Couldn’t reach the server from this page. Check the address, that it’s https, and that its proxy allows requests from tether.rikardwallen.com (CORS).' : 'Immich check failed: ' + e.message;
+  }
+}
+
 /* copy a shot the camera has announced, make the JPEG, add it to the gallery, save */
 async function importShot(ev, label, meta) {
   const cam = S.cam, want = S.imp, keepAll = want !== 'jpeg';
@@ -945,11 +1160,13 @@ async function importShot(ev, label, meta) {
   const t0 = performance.now();
   const {head, blob} = await cam.download(ev.token, ev.size, (g, n) => { showProg(g / n); say(`Copying${label}… ${Math.round(g / n * 100)}%`); }, keepAll);
   hideProg();
-  const secs = ((performance.now() - t0) / 1000).toFixed(1), base = 'X1D_' + stamp();
+  const secs = ((performance.now() - t0) / 1000).toFixed(1), tags = exifTags(head), taken = (tags && exifDate(tags.dateOriginal)) || new Date();
+  const base = fileBase(taken);
   const prev = previewFrom3FR(head);
   let jpeg = null, thumb = '';
   if (prev) {
     jpeg = await new Promise(r => prev.toBlob(r, 'image/jpeg', 0.92));
+    try { jpeg = await jpegWithExif(jpeg, head); } catch (e) { log('JPEG EXIF: ' + e.message); }
     const tc = document.createElement('canvas'); tc.width = 224; tc.height = 168; tc.getContext('2d').drawImage(prev, 0, 0, 224, 168); thumb = tc.toDataURL('image/jpeg', .7);
   }
   const files = [];
@@ -965,6 +1182,11 @@ async function importShot(ev, label, meta) {
   for (const [b, n] of files) {
     if (saved && !n.endsWith('.jpg')) { const s = document.createElement('span'); s.textContent = '3FR saved'; s.style.color = 'var(--ok)'; acts.appendChild(s); continue; }   // don't hold 110 MB per shot in memory once it's in Downloads
     const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = n; a.textContent = n.endsWith('.jpg') ? 'JPEG' : '3FR'; acts.appendChild(a);
+  }
+  if (IMMICH.on() && S.real || IMMICH.on() && IMMICH.demoToo) {
+    const st = document.createElement('span'); st.textContent = 'Immich: queued'; acts.appendChild(st);
+    immichQueue = immichQueue.then(async () => { for (const [b, n] of files) { st.textContent = 'Immich: uploading ' + (n.endsWith('.jpg') ? 'JPEG' : '3FR') + '…'; await immichUpload(b, n, taken); } st.textContent = 'Immich: uploaded'; st.style.color = 'var(--ok)'; })
+      .catch(e => { st.textContent = 'Immich: failed (' + e.message + ')'; st.style.color = '#ff5a4f'; log('Immich upload failed: ' + e.message); });
   }
   if (navigator.canShare && files.length && navigator.canShare({files: [new File([files[0][0]], files[0][1])]})) {
     const sb = document.createElement('button'); sb.textContent = 'Share'; acts.appendChild(sb);
@@ -1081,8 +1303,8 @@ $('btnPeak').onclick = e => { e.stopPropagation(); PEAK.on = !PEAK.on; $('btnPea
   if (PEAK.on) say('Focus peaking on: the sharpest edges show in red.'); };
 $('btnZoom').onclick = e => { e.stopPropagation(); setZoom(ZOOM.z === 1 ? 2 : ZOOM.z === 2 ? 4 : 1); };
 cv.addEventListener('click', e => {
-  if (ZOOM.z === 1) return;
   const b = cv.getBoundingClientRect(), u = (e.clientX - b.left) / b.width, v = (e.clientY - b.top) / b.height;
+  if (ZOOM.z === 1) { ZOOM.cx = u; ZOOM.cy = v; setZoom(2); return; }            // tap to magnify that spot
   ZOOM.cx += (u - 0.5) / ZOOM.z; ZOOM.cy += (v - 0.5) / ZOOM.z;
   if (S.real) { if (S.lv && LVR.last) renderLiveFrame(LVR.last, cv); } else draw();
 });
@@ -1090,6 +1312,70 @@ $('ovLv').onclick = () => { log('tap: ' + $('ovLv').textContent); setLive(!S.lv)
 
 /* --- start in demo mode, mid-use --- */
 renderDials();
+/* live view aids */
+const loadFlag = k => { try { return localStorage.getItem(k) === '1'; } catch (e) { return false; } }, saveFlag = (k, v) => { try { localStorage.setItem(k, v ? '1' : '0'); } catch (e) {} };
+$('chkGrid').checked = loadFlag('x1d.grid'); $('grid3').hidden = !$('chkGrid').checked;
+$('chkGrid').onchange = () => { $('grid3').hidden = !$('chkGrid').checked; saveFlag('x1d.grid', $('chkGrid').checked); };
+$('chkHisto').checked = HISTO.on = loadFlag('x1d.histo'); $('histo').hidden = !HISTO.on;
+$('chkHisto').onchange = () => { HISTO.on = $('chkHisto').checked; $('histo').hidden = !HISTO.on; saveFlag('x1d.histo', HISTO.on); if (S.real) { if (S.lv && LVR.last) renderLiveFrame(LVR.last, cv); } else draw(); };
+/* read-only feature check: list the camera's settings and describe every code up to 0xA0 */
+const KNOWN = {0x50: 'zoom position (X1D II live-view zoom)', 0x51: 'live video mode', 0x54: 'focus point (X1D II: tap to focus)', 0x55: 'focus size', 0x86: 'focus region', 0x87: 'live video zoom factor', 0x4c: 'Auto ISO'};
+$('btnFeatures').onclick = async () => {
+  if (!S.cam || !S.real) { $('featMsg').textContent = 'Connect the camera first.'; return; }
+  if (S.busy) { say('Busy (' + S.busyWhat + '). Try again in a moment.'); return; }
+  S.busy = true; S.busyWhat = 'feature check'; const found = [], interesting = [];
+  try {
+    const list = await S.cam.call(OP.LIST); const codes = []; for (let i = 0; i + 1 < list.length; i += 2) codes.push(list[i] | list[i + 1] << 8);
+    log('features: camera lists ' + codes.length + ' settings: ' + codes.map(c => '0x' + c.toString(16)).join(' '));
+    for (let c = 1; c <= 0xa0; c++) {
+      $('featMsg').textContent = 'Checking setting 0x' + c.toString(16) + '…';
+      let r; try { r = await S.cam.call(OP.DESCRIBE, c, undefined, 2500, true); } catch (e) { continue; }
+      if (r && r.length >= 2 && r[0]) { const txt = td.decode(r.subarray(2)).replace(/[^\x20-\x7e]+/g, ' ').trim(); found.push(c); log(`features: 0x${c.toString(16)} supported${r[1] ? ', writable' : ''}: ${txt.slice(0, 80)}`); if (KNOWN[c]) interesting.push(`0x${c.toString(16)} ${KNOWN[c]}${r[1] ? ' (writable)' : ''}`); }
+    }
+    const focusPt = found.includes(0x54), zoomPt = found.includes(0x50);
+    $('featMsg').innerHTML = `${found.length} settings answer. Focus point: <b>${focusPt ? 'available' : 'not available'}</b>. Camera zoom position: <b>${zoomPt ? 'available' : 'not available'}</b>.` + (interesting.length ? ' Also: ' + interesting.join('; ') + '.' : '') + ' Save the log and send it over for the details.';
+    log('features: done; interesting: ' + (interesting.join('; ') || 'none'));
+  } catch (e) { $('featMsg').textContent = 'Check stopped: ' + e.message; log('features: ' + e.message); }
+  S.busy = false;
+};
+/* time-lapse: shots at a fixed interval, imported as normal; live view off meanwhile */
+const TL = {every: 10, n: 10, running: false, stop: false};
+document.querySelectorAll('#segTlI button').forEach(b => b.onclick = () => { document.querySelectorAll('#segTlI button').forEach(x => x.classList.toggle('on', x === b)); TL.every = +b.dataset.i; });
+document.querySelectorAll('#segTlN button').forEach(b => b.onclick = () => { document.querySelectorAll('#segTlN button').forEach(x => x.classList.toggle('on', x === b)); TL.n = +b.dataset.n; });
+$('btnTl').onclick = async () => {
+  if (TL.running) { TL.stop = true; $('tlMsg').textContent = 'Stopping after this frame…'; return; }
+  if (!S.cam) { say('No camera connected'); return; }
+  if (S.busy) { say('Busy (' + S.busyWhat + '). Try again in a moment.'); return; }
+  TL.running = true; TL.stop = false; S.busy = true; S.busyWhat = 'time-lapse'; $('btnTl').textContent = 'Stop time-lapse'; $('tlState').textContent = 'running';
+  const wasLv = S.real && S.lv; if (wasLv) await stopLive().catch(() => {});
+  let done = 0;
+  try {
+    for (let i = 0; !TL.stop && (TL.n === 0 || i < TL.n); i++) {
+      const t0 = performance.now();
+      $('tlMsg').textContent = `Frame ${i + 1}${TL.n ? ' of ' + TL.n : ''}…`;
+      S.reps = 1; await fireOnce(0); done++;
+      const wait = TL.every * 1000 - (performance.now() - t0);
+      for (let left = wait; left > 0 && !TL.stop && (TL.n === 0 || i < TL.n - 1); left -= 250) { $('tlMsg').textContent = `${done} done${TL.n ? ' of ' + TL.n : ''}. Next in ${Math.ceil(left / 1000)} s.`; await sleep(Math.min(250, left)); }
+      if (S.real && typeof S.battery === 'number' && S.battery <= 5) { $('tlMsg').textContent = 'Stopped: camera battery at ' + S.battery + '%.'; break; }
+    }
+    $('tlMsg').textContent = `Time-lapse finished: ${done} frame${done === 1 ? '' : 's'}.`;
+  } catch (e) { $('tlMsg').textContent = `Time-lapse stopped after ${done} frames: ${e.message}`; log('time-lapse: ' + e.message); }
+  TL.running = false; S.busy = false; $('btnTl').textContent = 'Start time-lapse'; $('tlState').textContent = 'off';
+  document.querySelectorAll('#segRep button.on').forEach(b => S.reps = +b.dataset.r);
+  if (wasLv && S.cam) setLive(true);
+};
+/* naming + Immich settings */
+const setNaming = v => { S.naming = v; document.querySelectorAll('#segName button').forEach(b => b.classList.toggle('on', b.dataset.n === v)); try { localStorage.setItem('x1d.naming', v); } catch (e) {} if (v === 'camera') say('Camera numbering is experimental: names follow the card (B0000xxx). Check them against the card the first few times.'); };
+document.querySelectorAll('#segName button').forEach(b => b.onclick = () => setNaming(b.dataset.n)); setNaming(S.naming);
+(() => { try {
+  $('immichUrl').value = localStorage.getItem('x1d.immich.url') || ''; $('immichKey').value = localStorage.getItem('x1d.immich.key') || ''; $('chkImmich').checked = localStorage.getItem('x1d.immich.on') === '1';
+} catch (e) {} })();
+const immichState = () => { $('immichState').textContent = IMMICH.on() ? 'on' : 'off'; };
+$('immichUrl').onchange = () => { try { localStorage.setItem('x1d.immich.url', $('immichUrl').value.trim()); } catch (e) {} immichState(); };
+$('immichKey').onchange = () => { try { localStorage.setItem('x1d.immich.key', $('immichKey').value.trim()); } catch (e) {} immichState(); };
+$('chkImmich').onchange = () => { try { localStorage.setItem('x1d.immich.on', $('chkImmich').checked ? '1' : '0'); } catch (e) {} immichState(); if ($('chkImmich').checked && (!IMMICH.url || !IMMICH.key)) $('immichMsg').textContent = 'Enter the server address and an API key, then tap Test connection.'; };
+$('btnImmichTest').onclick = () => { $('immichUrl').onchange(); $('immichKey').onchange(); immichTest(); };
+immichState();
 attach(new SimTransport()).then(() => { log('demo camera ready'); });
 }
 </script>
